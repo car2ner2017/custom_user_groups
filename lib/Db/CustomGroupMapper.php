@@ -1,0 +1,340 @@
+<?php
+
+declare(strict_types=1);
+
+namespace OCA\CustomUserGroups\Db;
+
+use DateTime;
+use OCP\AppFramework\Db\QBMapper;
+use OCP\DB\QueryBuilder\IQueryBuilder;
+use OCP\IDBConnection;
+
+/**
+ * @template-extends QBMapper<CustomGroupMember>
+ */
+class CustomGroupMapper extends QBMapper {
+
+	public function __construct(IDBConnection $db) {
+		parent::__construct($db, 'custom_user_groups', CustomGroupMember::class);
+	}
+
+	public function groupExists(string $groupId): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
+
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->closeCursor();
+
+		return $count > 0;
+	}
+
+	public function getGroupName(string $groupId): ?string {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('name')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)))
+			->setMaxResults(1);
+
+		$result = $qb->executeQuery();
+		$row = $result->fetchAssociative();
+		$result->closeCursor();
+
+		return $row ? (string)$row['name'] : null;
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public function getMembers(string $groupId, string $search = '', int $limit = -1, int $offset = 0): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('member_id')
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)),
+					$qb->expr()->isNotNull('member_id'),
+					$qb->expr()->neq('member_id', $qb->createNamedParameter(''))
+				)
+			);
+
+		if ($search !== '') {
+			$qb->andWhere($qb->expr()->like('member_id', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($search) . '%')));
+		}
+
+		if ($limit > 0) {
+			$qb->setMaxResults($limit);
+		}
+		if ($offset > 0) {
+			$qb->setFirstResult($offset);
+		}
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		return array_values(array_unique(array_filter(array_column($rows, 'member_id'))));
+	}
+
+	public function countMembers(string $groupId, string $search = ''): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(DISTINCT ' . $qb->getColumnName('member_id') . ')'))
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)),
+					$qb->expr()->isNotNull('member_id'),
+					$qb->expr()->neq('member_id', $qb->createNamedParameter(''))
+				)
+			);
+
+		if ($search !== '') {
+			$qb->andWhere($qb->expr()->like('member_id', $qb->createNamedParameter('%' . $this->db->escapeLikeParameter($search) . '%')));
+		}
+
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->closeCursor();
+
+		return $count;
+	}
+
+	public function isMember(string $groupId, string $userId): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from($this->getTableName())
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)),
+					$qb->expr()->eq('member_id', $qb->createNamedParameter($userId))
+				)
+			);
+
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->closeCursor();
+
+		return $count > 0;
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public function getUserGroupIds(string $userId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('group_id')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('member_id', $qb->createNamedParameter($userId)));
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		return array_values(array_filter(array_column($rows, 'group_id')));
+	}
+
+	/**
+	 * @return string[]
+	 */
+	public function getGroupIds(string $search = '', int $limit = -1, int $offset = 0): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->selectDistinct('group_id')
+			->from($this->getTableName());
+
+		if ($search !== '') {
+			$escaped = '%' . $this->db->escapeLikeParameter($search) . '%';
+			$qb->where(
+				$qb->expr()->orX(
+					$qb->expr()->like('name', $qb->createNamedParameter($escaped)),
+					$qb->expr()->like('group_id', $qb->createNamedParameter($escaped))
+				)
+			);
+		}
+
+		if ($limit > 0) {
+			$qb->setMaxResults($limit);
+		}
+		if ($offset > 0) {
+			$qb->setFirstResult($offset);
+		}
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		return array_values(array_filter(array_column($rows, 'group_id')));
+	}
+
+	/**
+	 * Returns metadata and list of member IDs for a group
+	 *
+	 * @return array{group_id: string, name: string, creator_id: string, created_at: string, member_ids: string[]}|null
+	 */
+	public function getGroupDetails(string $groupId): ?array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)))
+			->orderBy('id', 'ASC');
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		if (empty($rows)) {
+			return null;
+		}
+
+		$first = $rows[0];
+		$members = [];
+		foreach ($rows as $row) {
+			if (!empty($row['member_id'])) {
+				$members[] = (string)$row['member_id'];
+			}
+		}
+
+		return [
+			'group_id' => (string)$first['group_id'],
+			'name' => (string)$first['name'],
+			'creator_id' => (string)$first['creator_id'],
+			'created_at' => (string)$first['created_at'],
+			'member_ids' => array_values(array_unique($members)),
+		];
+	}
+
+	/**
+	 * Returns list of groups with members
+	 *
+	 * @return array<int, array{group_id: string, name: string, creator_id: string, created_at: string, member_ids: string[]}>
+	 */
+	public function getAllGroups(?string $forUserId = null, bool $isAdmin = false, string $search = ''): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('*')
+			->from($this->getTableName())
+			->orderBy('created_at', 'DESC')
+			->addOrderBy('id', 'ASC');
+
+		if (!$isAdmin && $forUserId !== null) {
+			// Find group_ids where user is creator or member
+			$subQb = $this->db->getQueryBuilder();
+			$subQb->selectDistinct('group_id')
+				->from($this->getTableName())
+				->where(
+					$subQb->expr()->orX(
+						$subQb->expr()->eq('creator_id', $subQb->createNamedParameter($forUserId)),
+						$subQb->expr()->eq('member_id', $subQb->createNamedParameter($forUserId))
+					)
+				);
+			$subResult = $subQb->executeQuery();
+			$allowedGroupIds = array_column($subResult->fetchAllAssociative(), 'group_id');
+			$subResult->closeCursor();
+
+			if (empty($allowedGroupIds)) {
+				return [];
+			}
+
+			$qb->where($qb->expr()->in('group_id', $qb->createNamedParameter($allowedGroupIds, IQueryBuilder::PARAM_STR_ARRAY)));
+		}
+
+		if ($search !== '') {
+			$escaped = '%' . $this->db->escapeLikeParameter($search) . '%';
+			$qb->andWhere(
+				$qb->expr()->orX(
+					$qb->expr()->like('name', $qb->createNamedParameter($escaped)),
+					$qb->expr()->like('group_id', $qb->createNamedParameter($escaped))
+				)
+			);
+		}
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		$groups = [];
+		foreach ($rows as $row) {
+			$gid = (string)$row['group_id'];
+			if (!isset($groups[$gid])) {
+				$groups[$gid] = [
+					'group_id' => $gid,
+					'name' => (string)$row['name'],
+					'creator_id' => (string)$row['creator_id'],
+					'created_at' => (string)$row['created_at'],
+					'member_ids' => [],
+				];
+			}
+			if (!empty($row['member_id'])) {
+				$groups[$gid]['member_ids'][] = (string)$row['member_id'];
+			}
+		}
+
+		// Ensure unique member_ids
+		foreach ($groups as &$group) {
+			$group['member_ids'] = array_values(array_unique($group['member_ids']));
+		}
+
+		return array_values($groups);
+	}
+
+	/**
+	 * Create group and insert rows per member
+	 *
+	 * @param string[] $memberIds
+	 */
+	public function createGroup(string $groupId, string $name, string $creatorId, array $memberIds, DateTime $createdAt): void {
+		$memberIds = array_values(array_unique(array_filter($memberIds)));
+
+		if (empty($memberIds)) {
+			$entity = new CustomGroupMember();
+			$entity->setGroupId($groupId);
+			$entity->setName($name);
+			$entity->setCreatorId($creatorId);
+			$entity->setMemberId(null);
+			$entity->setCreatedAt($createdAt);
+			$this->insert($entity);
+			return;
+		}
+
+		foreach ($memberIds as $memberId) {
+			$entity = new CustomGroupMember();
+			$entity->setGroupId($groupId);
+			$entity->setName($name);
+			$entity->setCreatorId($creatorId);
+			$entity->setMemberId($memberId);
+			$entity->setCreatedAt($createdAt);
+			$this->insert($entity);
+		}
+	}
+
+	/**
+	 * Update group name and members list
+	 *
+	 * @param string[] $newMemberIds
+	 */
+	public function updateGroup(string $groupId, string $newName, array $newMemberIds): void {
+		$existingDetails = $this->getGroupDetails($groupId);
+		if ($existingDetails === null) {
+			return;
+		}
+
+		$creatorId = $existingDetails['creator_id'];
+		$createdAt = new DateTime($existingDetails['created_at']);
+		$newMemberIds = array_values(array_unique(array_filter($newMemberIds)));
+
+		// Delete all existing rows for this group
+		$this->deleteGroup($groupId);
+
+		// Insert updated rows
+		$this->createGroup($groupId, $newName, $creatorId, $newMemberIds, $createdAt);
+	}
+
+	public function deleteGroup(string $groupId): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
+
+		$qb->executeStatement();
+	}
+}
+

@@ -1,0 +1,64 @@
+<template>
+	<NcModal
+		v-if="show"
+		:name="title"
+		size="small"
+		@close="$emit('close')">
+		<div class="confirm-content">
+			<p class="confirm-message">{{ message }}</p>
+			<div class="confirm-actions">
+				<NcButton
+					type="secondary"
+					:disabled="loading"
+					@click="$emit('close')">
+					Отмена
+				</NcButton>
+				<NcButton
+					type="error"
+					:disabled="loading"
+					@click="$emit('confirm')">
+					Удалить
+				</NcButton>
+			</div>
+		</div>
+	</NcModal>
+</template>
+
+<script setup lang="ts">
+import NcModal from '@nextcloud/vue/components/NcModal'
+import NcButton from '@nextcloud/vue/components/NcButton'
+
+defineProps<{
+	show: boolean
+	title: string
+	message: string
+	loading?: boolean
+}>()
+
+defineEmits<{
+	(e: 'close'): void
+	(e: 'confirm'): void
+}>()
+</script>
+
+<style scoped>
+.confirm-content {
+	padding: 16px 20px;
+}
+
+.confirm-message {
+	font-size: 14px;
+	line-height: 1.5;
+	color: var(--color-main-text);
+	margin-bottom: 20px;
+}
+
+.confirm-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 12px;
+	border-top: 1px solid var(--color-border);
+	padding-top: 12px;
+}
+</style>
+
