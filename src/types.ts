@@ -21,4 +21,3 @@ export interface AppState {
 	is_admin: boolean
 	groups: CustomGroup[]
 }
-

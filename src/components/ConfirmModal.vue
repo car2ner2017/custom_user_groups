@@ -5,7 +5,9 @@
 		size="small"
 		@close="$emit('close')">
 		<div class="confirm-content">
-			<p class="confirm-message">{{ message }}</p>
+			<p class="confirm-message">
+				{{ message }}
+			</p>
 			<div class="confirm-actions">
 				<NcButton
 					type="secondary"
@@ -61,4 +63,3 @@ defineEmits<{
 	padding-top: 12px;
 }
 </style>
-

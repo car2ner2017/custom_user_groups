@@ -35,7 +35,7 @@
 				<label class="form-label">
 					Участники группы ({{ selectedUsers.length }})
 				</label>
-				
+
 				<!-- Selected members chips -->
 				<div v-if="selectedUsers.length > 0" class="selected-chips">
 					<div
@@ -110,7 +110,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
@@ -138,7 +138,7 @@ const availableUsers = ref<UserOption[]>([])
 const userSearchQuery = ref('')
 const loading = ref(false)
 const loadingUsers = ref(false)
-let searchTimeout: any = null
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(
 	() => props.show,
@@ -157,7 +157,7 @@ watch(
 			fetchUsers('')
 		}
 	},
-	{ immediate: true }
+	{ immediate: true },
 )
 
 const filteredAvailableUsers = computed(() => {
@@ -180,7 +180,7 @@ async function fetchUsers(search: string) {
 		if (response.data && Array.isArray(response.data.users)) {
 			availableUsers.value = response.data.users
 		}
-	} catch (err: any) {
+	} catch (err: unknown) {
 		console.error('Error fetching Nextcloud users:', err)
 	} finally {
 		loadingUsers.value = false
@@ -226,8 +226,9 @@ async function submitForm() {
 			emit('saved', response.data)
 		}
 		emit('close')
-	} catch (err: any) {
-		const msg = err.response?.data?.error || err.message || 'Произошла ошибка при сохранении группы'
+	} catch (err: unknown) {
+		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
+		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Произошла ошибка при сохранении группы'
 		showError(msg)
 	} finally {
 		loading.value = false
@@ -384,4 +385,3 @@ async function submitForm() {
 	border-top: 1px solid var(--color-border);
 }
 </style>
-

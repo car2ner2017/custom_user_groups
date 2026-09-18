@@ -80,7 +80,9 @@
 			<div v-if="selectedGroup" class="group-details-container">
 				<header class="group-header">
 					<div class="group-title-section">
-						<h1 class="group-name">{{ selectedGroup.name }}</h1>
+						<h1 class="group-name">
+							{{ selectedGroup.name }}
+						</h1>
 						<div class="group-meta">
 							<span class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
 							<span class="meta-tag creator-tag">Создатель: {{ selectedGroup.creator_displayName }}</span>
@@ -203,7 +205,7 @@ const currentUserId = ref(initialState.current_user_id)
 const isAdmin = ref(initialState.is_admin)
 const allGroups = ref<CustomGroup[]>(initialState.groups || [])
 const selectedGroupId = ref<string | null>(
-	allGroups.value.length > 0 ? allGroups.value[0].group_id : null
+	allGroups.value.length > 0 ? allGroups.value[0].group_id : null,
 )
 
 const currentFilter = ref<'all' | 'mine' | 'member'>('all')
@@ -241,8 +243,8 @@ const filteredGroups = computed(() => {
 	if (query !== '') {
 		list = list.filter(
 			(g) =>
-				g.name.toLowerCase().includes(query) ||
-				g.group_id.toLowerCase().includes(query)
+				g.name.toLowerCase().includes(query)
+				|| g.group_id.toLowerCase().includes(query),
 		)
 	}
 
@@ -260,8 +262,8 @@ const filteredMembers = computed(() => {
 	if (query === '') return selectedGroup.value.members
 	return selectedGroup.value.members.filter(
 		(m) =>
-			m.displayName.toLowerCase().includes(query) ||
-			m.uid.toLowerCase().includes(query)
+			m.displayName.toLowerCase().includes(query)
+			|| m.uid.toLowerCase().includes(query),
 	)
 })
 
@@ -307,8 +309,9 @@ async function confirmDelete() {
 			selectedGroupId.value = allGroups.value.length > 0 ? allGroups.value[0].group_id : null
 		}
 		showDeleteModal.value = false
-	} catch (err: any) {
-		const msg = err.response?.data?.error || err.message || 'Ошибка при удалении группы'
+	} catch (err: unknown) {
+		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
+		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при удалении группы'
 		showError(msg)
 	} finally {
 		deleting.value = false
