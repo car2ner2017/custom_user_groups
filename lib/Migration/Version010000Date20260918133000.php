@@ -35,7 +35,7 @@ class Version010000Date20260918133000 extends SimpleMigrationStep {
 			$table->addColumn('id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
-				'length' => 4,
+				'length' => 20,
 			]);
 			$table->addColumn('group_id', Types::STRING, [
 				'notnull' => true,
@@ -74,4 +74,3 @@ class Version010000Date20260918133000 extends SimpleMigrationStep {
 	public function postSchemaChange(IOutput $output, Closure $schemaClosure, array $options): void {
 	}
 }
-
