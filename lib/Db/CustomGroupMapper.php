@@ -336,5 +336,89 @@ class CustomGroupMapper extends QBMapper {
 
 		$qb->executeStatement();
 	}
+
+	public function addToGroup(string $groupId, string $userId): bool {
+		if ($this->isMember($groupId, $userId)) {
+			return true;
+		}
+
+		$details = $this->getGroupDetails($groupId);
+		if ($details === null) {
+			return false;
+		}
+
+		// Check if there is a placeholder row with null or empty member_id
+		$qb = $this->db->getQueryBuilder();
+		$qb->select('id')
+			->from($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)))
+			->andWhere($qb->expr()->orX(
+				$qb->expr()->isNull('member_id'),
+				$qb->expr()->eq('member_id', $qb->createNamedParameter(''))
+			))
+			->setMaxResults(1);
+		$res = $qb->executeQuery();
+		$placeholderId = $res->fetchOne();
+		$res->closeCursor();
+
+		if ($placeholderId !== false) {
+			$updateQb = $this->db->getQueryBuilder();
+			$updateQb->update($this->getTableName())
+				->set('member_id', $updateQb->createNamedParameter($userId))
+				->where($updateQb->expr()->eq('id', $updateQb->createNamedParameter((int)$placeholderId)))
+				->executeStatement();
+			return true;
+		}
+
+		$entity = new CustomGroupMember();
+		$entity->setGroupId($groupId);
+		$entity->setName($details['name']);
+		$entity->setCreatorId($details['creator_id']);
+		$entity->setMemberId($userId);
+		$entity->setCreatedAt(new DateTime($details['created_at']));
+		$this->insert($entity);
+
+		return true;
+	}
+
+	public function removeFromGroup(string $groupId, string $userId): bool {
+		if (!$this->isMember($groupId, $userId)) {
+			return true;
+		}
+
+		$details = $this->getGroupDetails($groupId);
+		if ($details === null) {
+			return false;
+		}
+
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)))
+			->andWhere($qb->expr()->eq('member_id', $qb->createNamedParameter($userId)))
+			->executeStatement();
+
+		// If no rows remain for this group, insert a placeholder row so the group itself persists
+		if (!$this->groupExists($groupId)) {
+			$entity = new CustomGroupMember();
+			$entity->setGroupId($groupId);
+			$entity->setName($details['name']);
+			$entity->setCreatorId($details['creator_id']);
+			$entity->setMemberId(null);
+			$entity->setCreatedAt(new DateTime($details['created_at']));
+			$this->insert($entity);
+		}
+
+		return true;
+	}
+
+	public function setGroupName(string $groupId, string $name): bool {
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('name', $qb->createNamedParameter($name))
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)))
+			->executeStatement();
+
+		return true;
+	}
 }
 

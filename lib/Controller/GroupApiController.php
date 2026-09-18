@@ -12,6 +12,12 @@ use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\JSONResponse;
+use OCP\EventDispatcher\IEventDispatcher;
+use OCP\Group\Events\GroupChangedEvent;
+use OCP\Group\Events\GroupCreatedEvent;
+use OCP\Group\Events\UserAddedEvent;
+use OCP\Group\Events\UserRemovedEvent;
+use OCP\IGroup;
 use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUser;
@@ -25,6 +31,7 @@ class GroupApiController extends Controller {
 		private CustomGroupMapper $mapper,
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
+		private IEventDispatcher $eventDispatcher,
 		private ?string $userId,
 	) {
 		parent::__construct($appName, $request);
@@ -99,6 +106,18 @@ class GroupApiController extends Controller {
 				return new JSONResponse(['error' => 'Failed to create group'], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
+			// Dispatch Nextcloud group events so files_sharing and other apps register the group and members
+			$group = $this->groupManager->get($finalGid);
+			if ($group instanceof IGroup) {
+				$this->eventDispatcher->dispatchTyped(new GroupCreatedEvent($group));
+				foreach ($validMemberIds as $uid) {
+					$user = $this->userManager->get($uid);
+					if ($user instanceof IUser) {
+						$this->eventDispatcher->dispatchTyped(new UserAddedEvent($group, $user));
+					}
+				}
+			}
+
 			$isAdmin = $this->groupManager->isAdmin($this->userId);
 			return new JSONResponse($this->enrichGroup($created, $isAdmin), Http::STATUS_CREATED);
 		} catch (Exception $e) {
@@ -142,10 +161,35 @@ class GroupApiController extends Controller {
 		}
 
 		try {
+			$oldMembers = $existing['member_ids'];
+			$toAdd = array_values(array_diff($validMemberIds, $oldMembers));
+			$toRemove = array_values(array_diff($oldMembers, $validMemberIds));
+			$nameChanged = ($existing['name'] !== $name);
+
 			$this->mapper->updateGroup($groupId, $name, $validMemberIds);
 			$updated = $this->mapper->getGroupDetails($groupId);
 			if ($updated === null) {
 				return new JSONResponse(['error' => 'Failed to update group'], Http::STATUS_INTERNAL_SERVER_ERROR);
+			}
+
+			// Dispatch Nextcloud core group events so files_sharing updates mounts and permissions
+			$group = $this->groupManager->get($groupId);
+			if ($group instanceof IGroup) {
+				if ($nameChanged) {
+					$this->eventDispatcher->dispatchTyped(new GroupChangedEvent($group, 'displayName', $name, $existing['name']));
+				}
+				foreach ($toRemove as $uid) {
+					$user = $this->userManager->get($uid);
+					if ($user instanceof IUser) {
+						$this->eventDispatcher->dispatchTyped(new UserRemovedEvent($group, $user));
+					}
+				}
+				foreach ($toAdd as $uid) {
+					$user = $this->userManager->get($uid);
+					if ($user instanceof IUser) {
+						$this->eventDispatcher->dispatchTyped(new UserAddedEvent($group, $user));
+					}
+				}
 			}
 
 			return new JSONResponse($this->enrichGroup($updated, $isAdmin));
@@ -177,7 +221,12 @@ class GroupApiController extends Controller {
 		}
 
 		try {
-			$this->mapper->deleteGroup($groupId);
+			$group = $this->groupManager->get($groupId);
+			if ($group instanceof IGroup) {
+				$group->delete();
+			} else {
+				$this->mapper->deleteGroup($groupId);
+			}
 			return new JSONResponse(['success' => true]);
 		} catch (Exception $e) {
 			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);

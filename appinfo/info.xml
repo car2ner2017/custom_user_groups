@@ -9,6 +9,12 @@
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="car2ner2017@gmail.com" homepage="https://github.com/car2ner2017">Jakonda</author>
 	<namespace>CustomUserGroups</namespace>
+	<types>
+		<authentication/>
+		<filesystem/>
+		<dav/>
+		<prevent_group_restriction/>
+	</types>
 	<category>tools</category>
 	<bugs>https://github.com/car2ner2017/user_groups/issues</bugs>
 	<dependencies>

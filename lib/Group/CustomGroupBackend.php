@@ -6,18 +6,26 @@ namespace OCA\CustomUserGroups\Group;
 
 use OCA\CustomUserGroups\Db\CustomGroupMapper;
 use OCP\Group\Backend\ABackend;
+use OCP\Group\Backend\IAddToGroupBackend;
 use OCP\Group\Backend\ICountUsersBackend;
+use OCP\Group\Backend\IDeleteGroupBackend;
 use OCP\Group\Backend\IGetDisplayNameBackend;
 use OCP\Group\Backend\IGroupDetailsBackend;
+use OCP\Group\Backend\IRemoveFromGroupBackend;
 use OCP\Group\Backend\ISearchableGroupBackend;
+use OCP\Group\Backend\ISetDisplayNameBackend;
 use OCP\IUser;
 use OCP\IUserManager;
 
 class CustomGroupBackend extends ABackend implements
 	IGetDisplayNameBackend,
+	ISetDisplayNameBackend,
 	IGroupDetailsBackend,
 	ICountUsersBackend,
-	ISearchableGroupBackend {
+	ISearchableGroupBackend,
+	IAddToGroupBackend,
+	IRemoveFromGroupBackend,
+	IDeleteGroupBackend {
 
 	public function __construct(
 		private CustomGroupMapper $mapper,
@@ -89,6 +97,27 @@ class CustomGroupBackend extends ABackend implements
 			}
 		}
 		return $users;
+	}
+
+	#[\Override]
+	public function addToGroup(string $uid, string $gid): bool {
+		return $this->mapper->addToGroup($gid, $uid);
+	}
+
+	#[\Override]
+	public function removeFromGroup(string $uid, string $gid): void {
+		$this->mapper->removeFromGroup($gid, $uid);
+	}
+
+	#[\Override]
+	public function deleteGroup(string $gid): bool {
+		$this->mapper->deleteGroup($gid);
+		return true;
+	}
+
+	#[\Override]
+	public function setDisplayName(string $gid, string $displayName): bool {
+		return $this->mapper->setGroupName($gid, $displayName);
 	}
 }
 
