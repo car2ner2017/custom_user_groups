@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	  xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+	<id>customusergroups</id>
+	<name>Custom User Groups</name>
+	<summary>Permit to create custom user groups based on existing users by regular user</summary>
+	<description>Permit to create custom user groups based on existing users by regular user</description>
+	<version>1.0.0</version>
+	<licence>AGPL-3.0-or-later</licence>
+	<author mail="car2ner2017@gmail.com" homepage="https://github.com/car2ner2017">Jakonda</author>
+	<namespace>CustomUserGroups</namespace>
+	<category>tools</category>
+	<bugs>https://github.com/car2ner2017/user_groups/issues</bugs>
+	<dependencies>
+		<nextcloud min-version="31" max-version="34"/>
+	</dependencies>
+	<navigations>
+		<navigation>
+			<id>customusergroups</id>
+			<name>Custom User Groups</name>
+			<route>customusergroups.page.index</route>
+			<icon>app.svg</icon>
+			<type>link</type>
+		</navigation>
+	</navigations>
+</info>
