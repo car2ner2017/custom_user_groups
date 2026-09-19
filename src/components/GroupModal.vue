@@ -5,6 +5,7 @@
 		size="normal"
 		@close="$emit('close')">
 		<form class="group-form" @submit.prevent="submitForm">
+			<!-- Group Name Field -->
 			<div class="form-group">
 				<label for="group-name" class="form-label">
 					Название группы <span class="required">*</span>
@@ -13,50 +14,56 @@
 					id="group-name"
 					v-model="name"
 					placeholder="Например, Команда проекта или Бухгалтерия"
-					:disabled="loading"
+					:disabled="loading || !canEditName"
 					required />
-			</div>
-
-			<div v-if="!isEdit" class="form-group">
-				<label for="group-id" class="form-label">
-					Идентификатор группы (ID) <span class="optional">(необязательно)</span>
-				</label>
-				<NcTextField
-					id="group-id"
-					v-model="groupId"
-					placeholder="Будет сгенерирован автоматически, если оставить пустым"
-					:disabled="loading" />
-				<small class="help-text">
-					Системный ID для Nextcloud (буквы латиницы, цифры, дефис, подчеркивание).
+				<small v-if="isEdit && !canEditName" class="help-text text-warning">
+					Переименование группы доступно только создателю, администратору или управляющему.
 				</small>
 			</div>
 
+			<!-- Selected Group Members Section -->
 			<div class="form-group">
 				<label class="form-label">
 					Участники группы ({{ selectedUsers.length }})
 				</label>
 
-				<!-- Selected members chips -->
+				<!-- Filter input for already selected members -->
+				<div v-if="selectedUsers.length > 0" class="filter-selected-wrapper">
+					<NcTextField
+						v-model="selectedMembersFilter"
+						placeholder="Поиск участников группы (по имени, email или логину)..."
+						size="small"
+						:disabled="loading" />
+				</div>
+
+				<!-- Selected members chips with scroll and max height -->
 				<div v-if="selectedUsers.length > 0" class="selected-chips">
 					<div
-						v-for="user in selectedUsers"
+						v-for="user in filteredSelectedUsers"
 						:key="user.uid"
 						class="user-chip">
-						<span class="chip-name">{{ user.displayName }} ({{ user.uid }})</span>
+						<span class="chip-name">
+							{{ user.displayName }}
+							<span class="chip-email">({{ user.email || user.uid }})</span>
+						</span>
 						<button
 							type="button"
 							class="chip-remove-btn"
 							title="Удалить из группы"
+							:disabled="loading"
 							@click="removeUser(user.uid)">
 							✕
 						</button>
 					</div>
+					<div v-if="filteredSelectedUsers.length === 0" class="no-filtered-selected">
+						По запросу «{{ selectedMembersFilter }}» участники не найдены
+					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					Участники еще не выбраны. Вы можете выбрать их из списка ниже.
+					Участники еще не выбраны. Вы можете найти и добавить их из списка ниже.
 				</div>
 
-				<!-- Search users input -->
+				<!-- Search users input for adding new members -->
 				<div class="search-user-wrapper">
 					<NcTextField
 						v-model="userSearchQuery"
@@ -77,7 +84,7 @@
 						@click="addUser(user)">
 						<div class="user-item-info">
 							<span class="user-displayname">{{ user.displayName }}</span>
-							<span class="user-uid">@{{ user.uid }}</span>
+							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
 						</div>
 						<NcButton
 							type="tertiary"
@@ -91,6 +98,7 @@
 				</div>
 			</div>
 
+			<!-- Modal Actions -->
 			<div class="modal-actions">
 				<NcButton
 					type="secondary"
@@ -131,9 +139,14 @@ const emit = defineEmits<{
 }>()
 
 const isEdit = computed(() => props.group !== null)
+const canEditName = computed(() => {
+	if (!props.group) return true
+	return props.group.permissions ? props.group.permissions.can_edit_name : true
+})
+
 const name = ref('')
-const groupId = ref('')
 const selectedUsers = ref<UserOption[]>([])
+const selectedMembersFilter = ref('')
 const availableUsers = ref<UserOption[]>([])
 const userSearchQuery = ref('')
 const loading = ref(false)
@@ -146,19 +159,29 @@ watch(
 		if (isOpen) {
 			if (props.group) {
 				name.value = props.group.name
-				groupId.value = props.group.group_id
-				selectedUsers.value = [...props.group.members]
+				selectedUsers.value = props.group.members.map((m) => ({ ...m }))
 			} else {
 				name.value = ''
-				groupId.value = ''
 				selectedUsers.value = []
 			}
+			selectedMembersFilter.value = ''
 			userSearchQuery.value = ''
 			fetchUsers('')
 		}
 	},
 	{ immediate: true },
 )
+
+const filteredSelectedUsers = computed(() => {
+	const query = selectedMembersFilter.value.trim().toLowerCase()
+	if (query === '') return selectedUsers.value
+	return selectedUsers.value.filter((u) => {
+		const nameMatch = u.displayName.toLowerCase().includes(query)
+		const uidMatch = u.uid.toLowerCase().includes(query)
+		const emailMatch = u.email ? u.email.toLowerCase().includes(query) : false
+		return nameMatch || uidMatch || emailMatch
+	})
+})
 
 const filteredAvailableUsers = computed(() => {
 	const selectedUids = new Set(selectedUsers.value.map((u) => u.uid))
@@ -189,7 +212,7 @@ async function fetchUsers(search: string) {
 
 function addUser(user: UserOption) {
 	if (!selectedUsers.value.some((u) => u.uid === user.uid)) {
-		selectedUsers.value.push(user)
+		selectedUsers.value.push({ ...user })
 	}
 }
 
@@ -219,7 +242,6 @@ async function submitForm() {
 			const url = generateUrl('/apps/customusergroups/api/v1/groups')
 			const response = await axios.post(url, {
 				name: name.value.trim(),
-				groupId: groupId.value.trim() || undefined,
 				memberIds,
 			})
 			showSuccess('Группа успешно создана')
@@ -260,15 +282,17 @@ async function submitForm() {
 	color: var(--color-error);
 }
 
-.optional {
-	font-weight: normal;
-	color: var(--color-text-maxcontrast);
-	font-size: 12px;
-}
-
 .help-text {
 	font-size: 12px;
 	color: var(--color-text-maxcontrast);
+}
+
+.text-warning {
+	color: var(--color-warning, #e29300);
+}
+
+.filter-selected-wrapper {
+	margin-bottom: 6px;
 }
 
 .selected-chips {
@@ -278,7 +302,9 @@ async function submitForm() {
 	padding: 8px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
-	min-height: 42px;
+	max-height: 160px;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
 }
 
 .user-chip {
@@ -290,10 +316,20 @@ async function submitForm() {
 	color: var(--color-primary-element-light-text);
 	border-radius: 16px;
 	font-size: 13px;
+	max-width: 100%;
 }
 
 .chip-name {
 	font-weight: 500;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.chip-email {
+	font-size: 11px;
+	opacity: 0.85;
+	margin-left: 3px;
 }
 
 .chip-remove-btn {
@@ -314,7 +350,8 @@ async function submitForm() {
 	opacity: 1;
 }
 
-.no-members-hint {
+.no-members-hint,
+.no-filtered-selected {
 	font-size: 13px;
 	color: var(--color-text-maxcontrast);
 	font-style: italic;
@@ -322,7 +359,7 @@ async function submitForm() {
 }
 
 .search-user-wrapper {
-	margin-top: 4px;
+	margin-top: 10px;
 }
 
 .available-users-list {
@@ -363,7 +400,7 @@ async function submitForm() {
 	color: var(--color-main-text);
 }
 
-.user-uid {
+.user-email-uid {
 	font-size: 11px;
 	color: var(--color-text-maxcontrast);
 }

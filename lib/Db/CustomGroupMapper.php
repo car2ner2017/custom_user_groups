@@ -322,8 +322,17 @@ class CustomGroupMapper extends QBMapper {
 		$createdAt = new DateTime($existingDetails['created_at']);
 		$newMemberIds = array_values(array_unique(array_filter($newMemberIds)));
 
-		// Delete all existing rows for this group
-		$this->deleteGroup($groupId);
+		// Revoke delegations for users removed from group
+		$removed = array_diff($existingDetails['member_ids'], $newMemberIds);
+		foreach ($removed as $removedUid) {
+			$this->cleanupUserDelegation($groupId, (string)$removedUid);
+		}
+
+		// Delete existing membership rows for this group
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete($this->getTableName())
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
+		$qb->executeStatement();
 
 		// Insert updated rows
 		$this->createGroup($groupId, $newName, $creatorId, $newMemberIds, $createdAt);
@@ -333,8 +342,9 @@ class CustomGroupMapper extends QBMapper {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
-
 		$qb->executeStatement();
+
+		$this->cleanupGroupDelegationsAndRequests($groupId);
 	}
 
 	public function addToGroup(string $groupId, string $userId): bool {
@@ -397,6 +407,9 @@ class CustomGroupMapper extends QBMapper {
 			->andWhere($qb->expr()->eq('member_id', $qb->createNamedParameter($userId)))
 			->executeStatement();
 
+		// Revoke delegation when user is removed from membership
+		$this->cleanupUserDelegation($groupId, $userId);
+
 		// If no rows remain for this group, insert a placeholder row so the group itself persists
 		if (!$this->groupExists($groupId)) {
 			$entity = new CustomGroupMember();
@@ -409,6 +422,30 @@ class CustomGroupMapper extends QBMapper {
 		}
 
 		return true;
+	}
+
+	public function cleanupUserDelegation(string $groupId, string $userId): void {
+		$qb = $this->db->getQueryBuilder();
+		$qb->delete('custom_user_group_delegations')
+			->where(
+				$qb->expr()->andX(
+					$qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)),
+					$qb->expr()->eq('user_id', $qb->createNamedParameter($userId))
+				)
+			);
+		$qb->executeStatement();
+	}
+
+	public function cleanupGroupDelegationsAndRequests(string $groupId): void {
+		$qb1 = $this->db->getQueryBuilder();
+		$qb1->delete('custom_user_group_delegations')
+			->where($qb1->expr()->eq('group_id', $qb1->createNamedParameter($groupId)));
+		$qb1->executeStatement();
+
+		$qb2 = $this->db->getQueryBuilder();
+		$qb2->delete('custom_user_group_requests')
+			->where($qb2->expr()->eq('group_id', $qb2->createNamedParameter($groupId)));
+		$qb2->executeStatement();
 	}
 
 	public function setGroupName(string $groupId, string $name): bool {
