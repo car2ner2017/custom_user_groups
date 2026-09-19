@@ -20,6 +20,10 @@ class Application extends App implements IBootstrap {
 	}
 
 	public function register(IRegistrationContext $context): void {
+		$context->registerEventListener(
+			\OCP\Navigation\Events\LoadAdditionalEntriesEvent::class,
+			\OCA\CustomUserGroups\Listener\NavigationListener::class
+		);
 	}
 
 	public function boot(IBootContext $context): void {

@@ -6,7 +6,9 @@ namespace OCA\CustomUserGroups\Controller;
 
 use OCA\CustomUserGroups\AppInfo\Application;
 use OCA\CustomUserGroups\Db\CustomGroupMapper;
+use OCA\CustomUserGroups\Service\SettingsService;
 use OCP\AppFramework\Controller;
+use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;
 use OCP\AppFramework\Http\Attribute\NoAdminRequired;
 use OCP\AppFramework\Http\Attribute\NoCSRFRequired;
@@ -29,6 +31,7 @@ class PageController extends Controller {
 		private IGroupManager $groupManager,
 		private CustomGroupMapper $mapper,
 		private IUserManager $userManager,
+		private SettingsService $settingsService,
 		private ?string $userId,
 	) {
 		parent::__construct($appName, $request);
@@ -39,7 +42,19 @@ class PageController extends Controller {
 	#[OpenAPI(OpenAPI::SCOPE_IGNORE)]
 	#[FrontpageRoute(verb: 'GET', url: '/')]
 	public function index(): TemplateResponse {
+		if ($this->userId !== null && !$this->settingsService->isUserAccessAllowed($this->userId)) {
+			$response = new TemplateResponse(
+				Application::APP_ID,
+				'forbidden',
+				[],
+				TemplateResponse::RENDER_AS_USER
+			);
+			$response->setStatus(Http::STATUS_FORBIDDEN);
+			return $response;
+		}
+
 		$isAdmin = ($this->userId !== null) && $this->groupManager->isAdmin($this->userId);
+		$canCreateGroups = $this->settingsService->canUserCreateGroups($this->userId);
 		$rawGroups = ($this->userId !== null) ? $this->mapper->getAllGroups($this->userId, $isAdmin) : [];
 
 		$groups = [];
@@ -71,6 +86,7 @@ class PageController extends Controller {
 		$state = [
 			'current_user_id' => $this->userId,
 			'is_admin' => $isAdmin,
+			'can_create_groups' => $canCreateGroups,
 			'groups' => $groups,
 		];
 

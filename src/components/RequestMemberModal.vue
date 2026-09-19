@@ -17,8 +17,7 @@
 				<NcTextField
 					v-model="searchQuery"
 					placeholder="Введите имя, email или логин пользователя..."
-					:disabled="submitting"
-					@input="onSearchInput" />
+					:disabled="submitting" />
 			</div>
 
 			<div v-if="loadingUsers" class="loading-state">
@@ -110,12 +109,14 @@ const filteredUsers = computed(() => {
 	return availableUsers.value.filter((u) => !existingUids.has(u.uid))
 })
 
-const onSearchInput = () => {
-	clearTimeout(searchTimer)
+watch(searchQuery, (newQuery) => {
+	if (searchTimer) {
+		clearTimeout(searchTimer)
+	}
 	searchTimer = setTimeout(() => {
-		fetchUsers(searchQuery.value)
+		fetchUsers(newQuery.trim())
 	}, 300)
-}
+})
 
 async function fetchUsers(search: string) {
 	loadingUsers.value = true
@@ -250,4 +251,3 @@ async function submit() {
 	border-top: 1px solid var(--color-border);
 }
 </style>
-

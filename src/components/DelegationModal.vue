@@ -14,15 +14,26 @@
 				<h3>Назначенные делегаты ({{ delegations.length }})</h3>
 			</div>
 
+			<!-- Filter input for currently assigned delegates -->
+			<div v-if="delegations.length > 0" class="filter-delegates-wrapper">
+				<NcTextField
+					v-model="delegatesFilter"
+					placeholder="Поиск среди назначенных делегатов (по имени, email или логину)..."
+					size="small" />
+			</div>
+
 			<div v-if="loadingDelegations" class="loading-state">
 				<NcLoadingIcon :size="24" /> Загрузка делегатов...
 			</div>
 			<div v-else-if="delegations.length === 0" class="empty-state">
 				В группе пока нет назначенных делегатов.
 			</div>
+			<div v-else-if="filteredDelegations.length === 0" class="empty-state">
+				По запросу «{{ delegatesFilter }}» назначенные делегаты не найдены.
+			</div>
 			<div v-else class="delegates-list">
 				<div
-					v-for="del in delegations"
+					v-for="del in filteredDelegations"
 					:key="del.user_id"
 					class="delegate-card">
 					<div class="delegate-info">
@@ -31,7 +42,6 @@
 					</div>
 
 					<div class="delegate-actions">
-						<!-- Level Switcher -->
 						<select
 							class="level-select"
 							:value="del.level"
@@ -59,78 +69,61 @@
 
 			<div class="divider" />
 
-			<!-- Add New Delegation Section -->
+			<!-- Assign Rights Section -->
 			<div class="section-title">
 				<h3>Назначить делегата</h3>
 			</div>
 
-			<div v-if="assignableMembers.length === 0" class="no-assignable-hint">
-				Все участники группы уже назначены делегатами или в группе нет других участников.
+			<!-- Search filter for members -->
+			<div class="search-member-wrapper">
+				<NcTextField
+					v-model="memberSearchQuery"
+					placeholder="Поиск среди участников группы для назначения прав..."
+					:disabled="assigningUid !== null" />
 			</div>
-			<form v-else class="add-delegation-form" @submit.prevent="submitDelegation">
-				<div class="form-group">
-					<label for="delegate-member-select" class="form-label">
-						Выберите участника группы <span class="required">*</span>
-					</label>
-					<select
-						id="delegate-member-select"
-						v-model="selectedMemberUid"
-						class="member-select"
-						:disabled="submitting"
-						required>
-						<option value="" disabled>
-							-- Выберите участника --
-						</option>
-						<option
-							v-for="member in assignableMembers"
-							:key="member.uid"
-							:value="member.uid">
-							{{ member.displayName }} ({{ member.email || member.uid }})
-						</option>
-					</select>
-				</div>
 
-				<div class="form-group">
-					<span class="form-label">Уровень прав <span class="required">*</span></span>
-					<div class="level-options">
-						<label class="level-radio-label">
-							<input
-								v-model="selectedLevel"
-								type="radio"
-								value="manage"
-								:disabled="submitting">
-							<div class="level-text">
-								<strong>Управление (Уровень 1)</strong>
-								<span class="level-desc">
-									Добавление и исключение участников, изменение названия, удаление группы, модерация заявок.
-								</span>
-							</div>
-						</label>
-						<label class="level-radio-label">
-							<input
-								v-model="selectedLevel"
-								type="radio"
-								value="moderate"
-								:disabled="submitting">
-							<div class="level-text">
-								<strong>Модерация (Уровень 2)</strong>
-								<span class="level-desc">
-									Добавление и исключение участников, модерация заявок. Без права переименования и удаления группы.
-								</span>
-							</div>
-						</label>
+			<!-- Candidate Members List -->
+			<div v-if="filteredMembers.length === 0" class="empty-state">
+				{{ memberSearchQuery.trim() ? 'Участники не найдены по запросу «' + memberSearchQuery + '»' : 'В группе нет участников, доступных для делегирования' }}
+			</div>
+			<div v-else class="available-users-list">
+				<div
+					v-for="member in filteredMembers"
+					:key="member.uid"
+					class="user-item">
+					<div class="user-item-info">
+						<span class="user-displayname">
+							{{ member.displayName }}
+							<span v-if="getMemberDelegationLevel(member.uid)" class="already-delegated-tag">
+								({{ getMemberDelegationLevel(member.uid) === 'manage' ? 'Управление' : 'Модерация' }})
+							</span>
+						</span>
+						<span class="user-email-uid">{{ member.email || ('@' + member.uid) }}</span>
+					</div>
+
+					<div class="member-assign-controls">
+						<select
+							v-model="memberLevels[member.uid]"
+							class="level-select"
+							:disabled="assigningUid === member.uid">
+							<option value="manage">
+								Управление
+							</option>
+							<option value="moderate">
+								Модерация
+							</option>
+						</select>
+
+						<NcButton
+							type="tertiary"
+							size="small"
+							:disabled="assigningUid === member.uid"
+							@click="assignRights(member.uid)">
+							{{ assigningUid === member.uid ? 'Сохранение...' : 'Назначить права' }}
+						</NcButton>
 					</div>
 				</div>
-
-				<div class="form-actions">
-					<NcButton
-						type="primary"
-						native-type="submit"
-						:disabled="submitting || !selectedMemberUid">
-						{{ submitting ? 'Назначение...' : 'Назначить права' }}
-					</NcButton>
-				</div>
-			</form>
+			</div>
 		</div>
 	</NcModal>
 </template>
@@ -139,6 +132,7 @@
 import { ref, computed, watch } from 'vue'
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
@@ -157,31 +151,65 @@ const emit = defineEmits<{
 
 const delegations = ref<Delegation[]>([])
 const loadingDelegations = ref(false)
-const selectedMemberUid = ref('')
-const selectedLevel = ref<'manage' | 'moderate'>('manage')
-const submitting = ref(false)
+const delegatesFilter = ref('')
+const memberSearchQuery = ref('')
+const memberLevels = ref<Record<string, 'manage' | 'moderate'>>({})
+const assigningUid = ref<string | null>(null)
 const updatingUid = ref<string | null>(null)
 
 watch(
 	() => props.show,
 	(isOpen) => {
 		if (isOpen && props.group) {
-			selectedMemberUid.value = ''
-			selectedLevel.value = 'manage'
+			delegatesFilter.value = ''
+			memberSearchQuery.value = ''
+			initMemberLevels()
 			fetchDelegations()
 		}
 	},
 	{ immediate: true },
 )
 
-const assignableMembers = computed(() => {
-	if (!props.group) return []
-	const delegatedUids = new Set(delegations.value.map((d) => d.user_id))
-	// Exclude creator and users who are already delegates
-	return props.group.members.filter(
-		(m) => m.uid !== props.group.creator_id && !delegatedUids.has(m.uid),
-	)
+function initMemberLevels() {
+	if (!props.group) return
+	const map: Record<string, 'manage' | 'moderate'> = {}
+	for (const m of props.group.members) {
+		const existingDel = delegations.value.find((d) => d.user_id === m.uid)
+		map[m.uid] = existingDel ? existingDel.level : 'manage'
+	}
+	memberLevels.value = map
+}
+
+const filteredDelegations = computed(() => {
+	const query = delegatesFilter.value.trim().toLowerCase()
+	if (!query) return delegations.value
+	return delegations.value.filter((d) => {
+		const nameMatch = d.displayName.toLowerCase().includes(query)
+		const uidMatch = d.user_id.toLowerCase().includes(query)
+		const emailMatch = d.email ? d.email.toLowerCase().includes(query) : false
+		return nameMatch || uidMatch || emailMatch
+	})
 })
+
+const filteredMembers = computed(() => {
+	if (!props.group) return []
+	const creatorId = props.group.creator_id
+	// Exclude creator from delegation list
+	const members = props.group.members.filter((m) => m.uid !== creatorId)
+	const query = memberSearchQuery.value.trim().toLowerCase()
+	if (!query) return members
+	return members.filter((m) => {
+		const nameMatch = m.displayName.toLowerCase().includes(query)
+		const uidMatch = m.uid.toLowerCase().includes(query)
+		const emailMatch = m.email ? m.email.toLowerCase().includes(query) : false
+		return nameMatch || uidMatch || emailMatch
+	})
+})
+
+function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
+	const del = delegations.value.find((d) => d.user_id === uid)
+	return del ? del.level : null
+}
 
 async function fetchDelegations() {
 	loadingDelegations.value = true
@@ -190,6 +218,7 @@ async function fetchDelegations() {
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.delegations)) {
 			delegations.value = response.data.delegations
+			initMemberLevels()
 		}
 	} catch (err: unknown) {
 		console.error('Failed to load delegations:', err)
@@ -210,6 +239,9 @@ async function onLevelChange(userId: string, newLevel: string) {
 		const idx = delegations.value.findIndex((d) => d.user_id === userId)
 		if (idx !== -1) {
 			delegations.value[idx] = response.data
+		}
+		if (memberLevels.value[userId]) {
+			memberLevels.value[userId] = newLevel as 'manage' | 'moderate'
 		}
 		showSuccess('Уровень прав обновлен')
 		emit('updated')
@@ -240,17 +272,21 @@ async function revoke(userId: string) {
 	}
 }
 
-async function submitDelegation() {
-	if (!selectedMemberUid.value) return
-	submitting.value = true
+async function assignRights(uid: string) {
+	const level = memberLevels.value[uid] || 'manage'
+	assigningUid.value = uid
 	try {
 		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
 		const response = await axios.post(url, {
-			userId: selectedMemberUid.value,
-			level: selectedLevel.value,
+			userId: uid,
+			level,
 		})
-		delegations.value.push(response.data)
-		selectedMemberUid.value = ''
+		const idx = delegations.value.findIndex((d) => d.user_id === uid)
+		if (idx !== -1) {
+			delegations.value[idx] = response.data
+		} else {
+			delegations.value.push(response.data)
+		}
 		showSuccess('Права успешно делегированы')
 		emit('updated')
 	} catch (err: unknown) {
@@ -258,7 +294,7 @@ async function submitDelegation() {
 		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при назначении прав'
 		showError(msg)
 	} finally {
-		submitting.value = false
+		assigningUid.value = null
 	}
 }
 </script>
@@ -285,9 +321,13 @@ async function submitDelegation() {
 	color: var(--color-main-text);
 }
 
+.filter-delegates-wrapper,
+.search-member-wrapper {
+	margin-bottom: 4px;
+}
+
 .loading-state,
-.empty-state,
-.no-assignable-hint {
+.empty-state {
 	padding: 12px;
 	text-align: center;
 	font-size: 13px;
@@ -300,7 +340,7 @@ async function submitDelegation() {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
-	max-height: 200px;
+	max-height: 180px;
 	overflow-y: auto;
 }
 
@@ -336,8 +376,7 @@ async function submitDelegation() {
 	gap: 8px;
 }
 
-.level-select,
-.member-select {
+.level-select {
 	padding: 4px 8px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
@@ -346,79 +385,56 @@ async function submitDelegation() {
 	font-size: 13px;
 }
 
-.member-select {
-	width: 100%;
-	padding: 8px;
-}
-
 .divider {
 	height: 1px;
 	background-color: var(--color-border);
 	margin: 4px 0;
 }
 
-.add-delegation-form {
-	display: flex;
-	flex-direction: column;
-	gap: 14px;
-}
-
-.form-group {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-}
-
-.form-label {
-	font-weight: 600;
-	font-size: 13px;
-	color: var(--color-main-text);
-}
-
-.required {
-	color: var(--color-error);
-}
-
-.level-options {
+.available-users-list {
 	display: flex;
 	flex-direction: column;
 	gap: 8px;
+	max-height: 240px;
+	overflow-y: auto;
 }
 
-.level-radio-label {
+.user-item {
 	display: flex;
-	align-items: flex-start;
-	gap: 10px;
-	padding: 8px 10px;
+	align-items: center;
+	justify-content: space-between;
+	padding: 8px 12px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
-	cursor: pointer;
+	background-color: var(--color-main-background);
 }
 
-.level-radio-label:hover {
-	background-color: var(--color-background-hover);
-}
-
-.level-text {
+.user-item-info {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
 }
 
-.level-text strong {
+.user-displayname {
 	font-size: 13px;
+	font-weight: 600;
 	color: var(--color-main-text);
 }
 
-.level-desc {
-	font-size: 12px;
-	color: var(--color-text-maxcontrast);
-	line-height: 1.3;
+.already-delegated-tag {
+	font-size: 11px;
+	font-weight: normal;
+	color: var(--color-primary-element);
+	margin-left: 4px;
 }
 
-.form-actions {
+.user-email-uid {
+	font-size: 11px;
+	color: var(--color-text-maxcontrast);
+}
+
+.member-assign-controls {
 	display: flex;
-	justify-content: flex-end;
+	align-items: center;
+	gap: 8px;
 }
 </style>
-

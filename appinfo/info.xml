@@ -20,13 +20,8 @@
 	<dependencies>
 		<nextcloud min-version="31" max-version="36"/>
 	</dependencies>
-	<navigations>
-		<navigation>
-			<id>customusergroups</id>
-			<name>Пользовательские группы</name>
-			<route>customusergroups.page.index</route>
-			<icon>app.svg</icon>
-			<type>link</type>
-		</navigation>
-	</navigations>
+	<settings>
+		<admin>OCA\CustomUserGroups\Settings\AdminSettings</admin>
+		<admin-section>OCA\CustomUserGroups\Settings\AdminSection</admin-section>
+	</settings>
 </info>

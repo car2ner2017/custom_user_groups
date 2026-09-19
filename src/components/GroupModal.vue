@@ -68,8 +68,7 @@
 					<NcTextField
 						v-model="userSearchQuery"
 						placeholder="Поиск пользователей Nextcloud для добавления..."
-						:disabled="loading"
-						@input="onSearchInput" />
+						:disabled="loading" />
 				</div>
 
 				<!-- Available users list -->
@@ -188,12 +187,14 @@ const filteredAvailableUsers = computed(() => {
 	return availableUsers.value.filter((u) => !selectedUids.has(u.uid))
 })
 
-const onSearchInput = () => {
-	clearTimeout(searchTimeout)
+watch(userSearchQuery, (newQuery) => {
+	if (searchTimeout) {
+		clearTimeout(searchTimeout)
+	}
 	searchTimeout = setTimeout(() => {
-		fetchUsers(userSearchQuery.value)
+		fetchUsers(newQuery.trim())
 	}, 300)
-}
+})
 
 async function fetchUsers(search: string) {
 	loadingUsers.value = true

@@ -12,6 +12,7 @@ use OCA\CustomUserGroups\Db\CustomGroupMapper;
 use OCA\CustomUserGroups\Db\CustomGroupRequest;
 use OCA\CustomUserGroups\Db\CustomGroupRequestMapper;
 use OCA\CustomUserGroups\Service\AuditService;
+use OCA\CustomUserGroups\Service\SettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;
@@ -37,6 +38,7 @@ class GroupApiController extends Controller {
 		private CustomGroupDelegationMapper $delegationMapper,
 		private CustomGroupRequestMapper $requestMapper,
 		private AuditService $auditService,
+		private SettingsService $settingsService,
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
 		private IEventDispatcher $eventDispatcher,
@@ -45,15 +47,37 @@ class GroupApiController extends Controller {
 		parent::__construct($appName, $request);
 	}
 
-	#[NoAdminRequired]
-	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups')]
-	public function getGroups(string $search = ''): JSONResponse {
+	private function checkAccess(): ?JSONResponse {
 		if ($this->userId === null) {
 			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
 		}
+		if (!$this->settingsService->isUserAccessAllowed($this->userId)) {
+			return new JSONResponse(['error' => 'Доступ к приложению ограничен администратором'], Http::STATUS_FORBIDDEN);
+		}
+		return null;
+	}
 
-		$isAdmin = $this->groupManager->isAdmin($this->userId);
-		$rawGroups = $this->mapper->getAllGroups($this->userId, $isAdmin, $search);
+	private function checkAdmin(): ?JSONResponse {
+		$authErr = $this->checkAccess();
+		if ($authErr !== null) {
+			return $authErr;
+		}
+		if (!$this->groupManager->isAdmin((string)$this->userId)) {
+			return new JSONResponse(['error' => 'Доступ разрешен только администраторам системы'], Http::STATUS_FORBIDDEN);
+		}
+		return null;
+	}
+
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups')]
+	public function getGroups(string $search = ''): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$isAdmin = $this->groupManager->isAdmin((string)$this->userId);
+		$canCreateGroups = $this->settingsService->canUserCreateGroups($this->userId);
+		$rawGroups = $this->mapper->getAllGroups((string)$this->userId, $isAdmin, $search);
 
 		$groups = [];
 		foreach ($rawGroups as $g) {
@@ -63,6 +87,7 @@ class GroupApiController extends Controller {
 		return new JSONResponse([
 			'groups' => $groups,
 			'isAdmin' => $isAdmin,
+			'canCreateGroups' => $canCreateGroups,
 			'currentUserId' => $this->userId,
 		]);
 	}
@@ -70,8 +95,15 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups')]
 	public function createGroup(string $name, array $memberIds = []): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		if (!$this->settingsService->canUserCreateGroups($this->userId)) {
+			return new JSONResponse(
+				['error' => 'Создание пользовательских групп ограничено администратором'],
+				Http::STATUS_FORBIDDEN
+			);
 		}
 
 		$name = trim($name);
@@ -98,16 +130,16 @@ class GroupApiController extends Controller {
 		}
 
 		try {
-			$this->mapper->createGroup($finalGid, $name, $this->userId, $validMemberIds, new DateTime());
+			$this->mapper->createGroup($finalGid, $name, (string)$this->userId, $validMemberIds, new DateTime());
 			$created = $this->mapper->getGroupDetails($finalGid);
 			if ($created === null) {
 				return new JSONResponse(['error' => 'Не удалось создать группу'], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
 			// Nextcloud Audit log
-			$this->auditService->auditGroupCreated($finalGid, $name, $this->userId);
+			$this->auditService->auditGroupCreated($finalGid, $name, (string)$this->userId);
 			foreach ($validMemberIds as $mUid) {
-				$this->auditService->auditMemberAdded($finalGid, $name, $mUid, $this->userId);
+				$this->auditService->auditMemberAdded($finalGid, $name, $mUid, (string)$this->userId);
 			}
 
 			// Dispatch Nextcloud core group events
@@ -122,7 +154,7 @@ class GroupApiController extends Controller {
 				}
 			}
 
-			$isAdmin = $this->groupManager->isAdmin($this->userId);
+			$isAdmin = $this->groupManager->isAdmin((string)$this->userId);
 			return new JSONResponse($this->enrichGroup($created, $isAdmin), Http::STATUS_CREATED);
 		} catch (Exception $e) {
 			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
@@ -132,8 +164,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'PUT', url: '/api/v1/groups/{groupId}')]
 	public function updateGroup(string $groupId, string $name, array $memberIds = []): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$existing = $this->mapper->getGroupDetails($groupId);
@@ -146,9 +178,10 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Название группы не может быть пустым'], Http::STATUS_BAD_REQUEST);
 		}
 
-		$isAdmin = $this->groupManager->isAdmin($this->userId);
-		$canManage = $this->canManageGroup($existing, $this->userId);
-		$canModerate = $this->canModerateGroup($existing, $this->userId);
+		$currentUid = (string)$this->userId;
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$canManage = $this->canManageGroup($existing, $currentUid);
+		$canModerate = $this->canModerateGroup($existing, $currentUid);
 
 		// Permission check for modifying group
 		if (!$canModerate) {
@@ -187,13 +220,13 @@ class GroupApiController extends Controller {
 
 			// Audit logs
 			if ($nameChanged) {
-				$this->auditService->auditGroupRenamed($groupId, $existing['name'], $name, $this->userId);
+				$this->auditService->auditGroupRenamed($groupId, $existing['name'], $name, $currentUid);
 			}
 			foreach ($toRemove as $uid) {
-				$this->auditService->auditMemberRemoved($groupId, $name, $uid, $this->userId);
+				$this->auditService->auditMemberRemoved($groupId, $name, $uid, $currentUid);
 			}
 			foreach ($toAdd as $uid) {
-				$this->auditService->auditMemberAdded($groupId, $name, $uid, $this->userId);
+				$this->auditService->auditMemberAdded($groupId, $name, $uid, $currentUid);
 			}
 
 			// Dispatch Nextcloud core group events
@@ -225,8 +258,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'DELETE', url: '/api/v1/groups/{groupId}')]
 	public function deleteGroup(string $groupId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$existing = $this->mapper->getGroupDetails($groupId);
@@ -234,8 +267,9 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
+		$currentUid = (string)$this->userId;
 		// Only creator, admin, or manage level can delete group
-		if (!$this->canManageGroup($existing, $this->userId)) {
+		if (!$this->canManageGroup($existing, $currentUid)) {
 			return new JSONResponse(
 				['error' => 'Удаление группы доступно только создателю, администратору или управляющему'],
 				Http::STATUS_FORBIDDEN
@@ -244,7 +278,7 @@ class GroupApiController extends Controller {
 
 		try {
 			// Audit log before deletion
-			$this->auditService->auditGroupDeleted($groupId, $existing['name'], $this->userId);
+			$this->auditService->auditGroupDeleted($groupId, $existing['name'], $currentUid);
 
 			$group = $this->groupManager->get($groupId);
 			if ($group instanceof IGroup) {
@@ -261,8 +295,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/users')]
 	public function searchUsers(string $search = '', int $limit = 50): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$limit = min(max(1, $limit), 100);
@@ -289,8 +323,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups/{groupId}/delegations')]
 	public function getDelegations(string $groupId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -305,8 +339,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups/{groupId}/delegations')]
 	public function addOrUpdateDelegation(string $groupId, string $userId, string $level): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -314,61 +348,56 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		// Only creator or admin can manage delegations
-		if (!$this->canManageDelegations($group, $this->userId)) {
+		$currentUid = (string)$this->userId;
+		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Управление делегированием прав доступно только создателю группы или администратору'],
+				['error' => 'Делегирование прав доступно только создателю группы или администратору'],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
-		$userId = trim($userId);
-		if (!$this->userManager->userExists($userId)) {
-			return new JSONResponse(['error' => 'Пользователь не найден в системе'], Http::STATUS_NOT_FOUND);
-		}
-
-		// User MUST be a current member of the group
+		// Strictly only active members of this group can be delegates
 		if (!$this->mapper->isMember($groupId, $userId)) {
 			return new JSONResponse(
-				['error' => 'Делегирование прав возможно только действующим участникам данной группы'],
+				['error' => 'Делегирование прав возможно только действующим участникам группы'],
+				Http::STATUS_BAD_REQUEST
+			);
+		}
+
+		// Owner cannot be assigned a delegation
+		if ($userId === $group['creator_id']) {
+			return new JSONResponse(
+				['error' => 'Создатель группы уже обладает всеми правами управления'],
 				Http::STATUS_BAD_REQUEST
 			);
 		}
 
 		if (!in_array($level, [CustomGroupDelegation::LEVEL_MANAGE, CustomGroupDelegation::LEVEL_MODERATE], true)) {
-			return new JSONResponse(['error' => 'Недопустимый уровень делегирования'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(
+				['error' => 'Некорректный уровень делегирования прав'],
+				Http::STATUS_BAD_REQUEST
+			);
 		}
 
-		$oldDelegation = $this->delegationMapper->getDelegation($groupId, $userId);
+		$existing = $this->delegationMapper->getDelegation($groupId, $userId);
+		$oldLevel = $existing ? $existing->getLevel() : null;
+
 		$delegation = $this->delegationMapper->setDelegation($groupId, $userId, $level);
 
 		// Audit logging
-		if ($oldDelegation !== null && $oldDelegation->getLevel() !== $level) {
-			$this->auditService->auditDelegationChanged(
-				$groupId,
-				$group['name'],
-				$userId,
-				(string)$oldDelegation->getLevel(),
-				$level,
-				$this->userId
-			);
-		} else {
-			$this->auditService->auditDelegationAssigned(
-				$groupId,
-				$group['name'],
-				$userId,
-				$level,
-				$this->userId
-			);
+		if ($oldLevel === null) {
+			$this->auditService->auditDelegationAssigned($groupId, $group['name'], $userId, $level, $currentUid);
+		} elseif ($oldLevel !== $level) {
+			$this->auditService->auditDelegationChanged($groupId, $group['name'], $userId, $oldLevel, $level, $currentUid);
 		}
 
-		$targetUser = $this->userManager->get($userId);
+		$user = $this->userManager->get($userId);
 		return new JSONResponse([
 			'id' => $delegation->getId(),
 			'group_id' => $groupId,
 			'user_id' => $userId,
-			'displayName' => $targetUser ? $targetUser->getDisplayName() : $userId,
-			'email' => ($targetUser && $targetUser->getEMailAddress()) ? $targetUser->getEMailAddress() : '',
+			'displayName' => $user ? $user->getDisplayName() : $userId,
+			'email' => ($user && $user->getEMailAddress()) ? $user->getEMailAddress() : '',
 			'level' => $delegation->getLevel(),
 			'created_at' => $delegation->getCreatedAt()?->format(DateTime::ATOM),
 		]);
@@ -377,8 +406,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'DELETE', url: '/api/v1/groups/{groupId}/delegations/{userId}')]
 	public function revokeDelegation(string $groupId, string $userId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -386,29 +415,32 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		// Only creator or admin can manage delegations
-		if (!$this->canManageDelegations($group, $this->userId)) {
+		$currentUid = (string)$this->userId;
+		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Управление делегированием прав доступно только создателю группы или администратору'],
+				['error' => 'Отзыв прав доступен только создателю группы или администратору'],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
-		$this->delegationMapper->removeDelegation($groupId, $userId);
-		$this->auditService->auditDelegationRevoked($groupId, $group['name'], $userId, $this->userId);
+		$existing = $this->delegationMapper->getDelegation($groupId, $userId);
+		if ($existing !== null) {
+			$this->delegationMapper->revokeDelegation($groupId, $userId);
+			$this->auditService->auditDelegationRevoked($groupId, $group['name'], $userId, $existing->getLevel(), $currentUid);
+		}
 
 		return new JSONResponse(['success' => true]);
 	}
 
 	// ==========================================
-	// MEMBERSHIP REQUEST ENDPOINTS
+	// REQUESTS ENDPOINTS
 	// ==========================================
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups/{groupId}/requests')]
 	public function getRequests(string $groupId, ?string $status = null): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -416,7 +448,8 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		if (!$this->canModerateGroup($group, $this->userId)) {
+		$currentUid = (string)$this->userId;
+		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
 				['error' => 'Просмотр заявок доступен только модераторам, управляющим или администратору'],
 				Http::STATUS_FORBIDDEN
@@ -424,24 +457,7 @@ class GroupApiController extends Controller {
 		}
 
 		$rawRequests = $this->requestMapper->getRequests($groupId, $status);
-		$requests = [];
-		foreach ($rawRequests as $r) {
-			$candUser = $this->userManager->get((string)$r->getCandidateId());
-			$reqUser = $this->userManager->get((string)$r->getRequesterId());
-			$requests[] = [
-				'id' => $r->getId(),
-				'group_id' => $r->getGroupId(),
-				'candidate_id' => $r->getCandidateId(),
-				'candidate_displayName' => $candUser ? $candUser->getDisplayName() : $r->getCandidateId(),
-				'candidate_email' => ($candUser && $candUser->getEMailAddress()) ? $candUser->getEMailAddress() : '',
-				'requester_id' => $r->getRequesterId(),
-				'requester_displayName' => $reqUser ? $reqUser->getDisplayName() : $r->getRequesterId(),
-				'status' => $r->getStatus(),
-				'created_at' => $r->getCreatedAt()?->format(DateTime::ATOM),
-				'updated_at' => $r->getUpdatedAt()?->format(DateTime::ATOM),
-				'processed_by' => $r->getProcessedBy(),
-			];
-		}
+		$requests = array_map(fn($r) => $this->enrichRequest($r), $rawRequests);
 
 		return new JSONResponse(['requests' => $requests]);
 	}
@@ -449,8 +465,8 @@ class GroupApiController extends Controller {
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups/{groupId}/requests')]
 	public function submitRequest(string $groupId, string $candidateId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -458,58 +474,56 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		// Check permission to submit request (group member, creator, or admin)
-		if (!$this->canRequestMember($group, $this->userId)) {
+		$candidateId = trim($candidateId);
+		if ($candidateId === '' || !$this->userManager->userExists($candidateId)) {
+			return new JSONResponse(['error' => 'Указанный пользователь не найден'], Http::STATUS_BAD_REQUEST);
+		}
+
+		$currentUid = (string)$this->userId;
+		if (!$this->canRequestMember($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Отправка заявок на добавление доступна только участникам группы'],
+				['error' => 'Предлагать участников могут только действующие члены группы, создатель или администратор'],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
-		$candidateId = trim($candidateId);
-		if (!$this->userManager->userExists($candidateId)) {
-			return new JSONResponse(['error' => 'Указанный пользователь не существует в Nextcloud'], Http::STATUS_NOT_FOUND);
-		}
-
-		// Cannot request if already a member
 		if ($this->mapper->isMember($groupId, $candidateId)) {
-			return new JSONResponse(['error' => 'Пользователь уже является участником данной группы'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => 'Пользователь уже является участником группы'], Http::STATUS_BAD_REQUEST);
 		}
 
-		// Prevent duplicate pending requests
-		if ($this->requestMapper->hasPendingRequest($groupId, $candidateId)) {
-			return new JSONResponse(
-				['error' => 'Запрос на добавление этого пользователя уже находится на рассмотрении'],
-				Http::STATUS_CONFLICT
-			);
+		if ($this->requestMapper->hasActiveRequest($groupId, $candidateId)) {
+			return new JSONResponse(['error' => 'Заявка на добавление этого пользователя уже находится на рассмотрении'], Http::STATUS_BAD_REQUEST);
 		}
 
-		$request = $this->requestMapper->createRequest($groupId, $candidateId, $this->userId);
-		$this->auditService->auditRequestSubmitted($groupId, $group['name'], $candidateId, $this->userId);
+		// If requester has Moderate/Manage permission or is Creator/Admin, auto-add directly!
+		if ($this->canModerateGroup($group, $currentUid)) {
+			$this->mapper->addToGroup($groupId, $candidateId);
+			$ncGroup = $this->groupManager->get($groupId);
+			if ($ncGroup instanceof IGroup) {
+				$candUser = $this->userManager->get($candidateId);
+				if ($candUser instanceof IUser) {
+					$this->eventDispatcher->dispatchTyped(new UserAddedEvent($ncGroup, $candUser));
+				}
+			}
+			$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
+			return new JSONResponse(['success' => true, 'added_directly' => true], Http::STATUS_CREATED);
+		}
 
-		$candUser = $this->userManager->get($candidateId);
-		$reqUser = $this->userManager->get($this->userId);
+		$request = $this->requestMapper->createRequest($groupId, $candidateId, $currentUid);
+		$this->auditService->auditRequestCreated($groupId, $group['name'], $candidateId, $currentUid);
 
 		return new JSONResponse([
-			'id' => $request->getId(),
-			'group_id' => $groupId,
-			'candidate_id' => $candidateId,
-			'candidate_displayName' => $candUser ? $candUser->getDisplayName() : $candidateId,
-			'candidate_email' => ($candUser && $candUser->getEMailAddress()) ? $candUser->getEMailAddress() : '',
-			'requester_id' => $this->userId,
-			'requester_displayName' => $reqUser ? $reqUser->getDisplayName() : $this->userId,
-			'status' => $request->getStatus(),
-			'created_at' => $request->getCreatedAt()?->format(DateTime::ATOM),
-			'updated_at' => $request->getUpdatedAt()?->format(DateTime::ATOM),
-			'processed_by' => null,
+			'success' => true,
+			'added_directly' => false,
+			'request' => $this->enrichRequest($request),
 		], Http::STATUS_CREATED);
 	}
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups/{groupId}/requests/{requestId}/approve')]
 	public function approveRequest(string $groupId, int $requestId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -517,7 +531,8 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		if (!$this->canModerateGroup($group, $this->userId)) {
+		$currentUid = (string)$this->userId;
+		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
 				['error' => 'Одобрение заявок доступно только модераторам, управляющим или администратору'],
 				Http::STATUS_FORBIDDEN
@@ -545,20 +560,23 @@ class GroupApiController extends Controller {
 			}
 		}
 
-		$updated = $this->requestMapper->updateStatus($requestId, CustomGroupRequest::STATUS_APPROVED, $this->userId);
+		$updated = $this->requestMapper->updateStatus($requestId, CustomGroupRequest::STATUS_APPROVED, $currentUid);
 
 		// Audit logging
-		$this->auditService->auditRequestApproved($groupId, $group['name'], $candidateId, $this->userId);
-		$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $this->userId);
+		$this->auditService->auditRequestApproved($groupId, $group['name'], $candidateId, $currentUid);
+		$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
 
-		return new JSONResponse($updated);
+		return new JSONResponse([
+			'success' => true,
+			'request' => $this->enrichRequest($updated),
+		]);
 	}
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups/{groupId}/requests/{requestId}/reject')]
 	public function rejectRequest(string $groupId, int $requestId): JSONResponse {
-		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+		if ($err = $this->checkAccess()) {
+			return $err;
 		}
 
 		$group = $this->mapper->getGroupDetails($groupId);
@@ -566,7 +584,8 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
 		}
 
-		if (!$this->canModerateGroup($group, $this->userId)) {
+		$currentUid = (string)$this->userId;
+		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
 				['error' => 'Отклонение заявок доступно только модераторам, управляющим или администратору'],
 				Http::STATUS_FORBIDDEN
@@ -583,12 +602,121 @@ class GroupApiController extends Controller {
 		}
 
 		$candidateId = (string)$request->getCandidateId();
-		$updated = $this->requestMapper->updateStatus($requestId, CustomGroupRequest::STATUS_REJECTED, $this->userId);
+		$updated = $this->requestMapper->updateStatus($requestId, CustomGroupRequest::STATUS_REJECTED, $currentUid);
 
 		// Audit logging
-		$this->auditService->auditRequestRejected($groupId, $group['name'], $candidateId, $this->userId);
+		$this->auditService->auditRequestRejected($groupId, $group['name'], $candidateId, $currentUid);
 
-		return new JSONResponse($updated);
+		return new JSONResponse([
+			'success' => true,
+			'request' => $this->enrichRequest($updated),
+		]);
+	}
+
+	// ==========================================
+	// ADMIN SETTINGS ENDPOINTS
+	// ==========================================
+
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/settings')]
+	public function getAdminSettings(): JSONResponse {
+		if ($err = $this->checkAdmin()) {
+			return $err;
+		}
+
+		$rawSettings = $this->settingsService->getAllSettings();
+
+		$enrichUsers = function (array $uids): array {
+			$res = [];
+			foreach ($uids as $uid) {
+				$user = $this->userManager->get($uid);
+				$res[] = [
+					'id' => $uid,
+					'uid' => $uid,
+					'displayName' => $user ? $user->getDisplayName() : $uid,
+					'email' => ($user && $user->getEMailAddress()) ? $user->getEMailAddress() : '',
+				];
+			}
+			return $res;
+		};
+
+		$enrichGroups = function (array $gids): array {
+			$res = [];
+			foreach ($gids as $gid) {
+				$group = $this->groupManager->get($gid);
+				$res[] = [
+					'id' => $gid,
+					'name' => $group ? $group->getDisplayName() : $gid,
+					'is_cug' => str_starts_with($gid, 'cug_'),
+				];
+			}
+			return $res;
+		};
+
+		return new JSONResponse([
+			'settings' => $rawSettings,
+			'create_allowed_users_details' => $enrichUsers($rawSettings['create_allowed_users']),
+			'create_allowed_groups_details' => $enrichGroups($rawSettings['create_allowed_groups']),
+			'access_forbidden_users_details' => $enrichUsers($rawSettings['access_forbidden_users']),
+			'access_forbidden_groups_details' => $enrichGroups($rawSettings['access_forbidden_groups']),
+		]);
+	}
+
+	#[FrontpageRoute(verb: 'POST', url: '/api/v1/admin/settings')]
+	public function saveAdminSettings(): JSONResponse {
+		if ($err = $this->checkAdmin()) {
+			return $err;
+		}
+
+		$params = $this->request->getParams();
+		$this->settingsService->saveSettings($params);
+
+		return $this->getAdminSettings();
+	}
+
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/groups-list')]
+	public function getAdminGroupsList(string $search = ''): JSONResponse {
+		if ($err = $this->checkAdmin()) {
+			return $err;
+		}
+
+		$groups = $this->groupManager->search($search, 100);
+		$result = [];
+		foreach ($groups as $group) {
+			$result[] = [
+				'id' => $group->getGID(),
+				'name' => $group->getDisplayName(),
+				'is_cug' => str_starts_with($group->getGID(), 'cug_'),
+			];
+		}
+
+		return new JSONResponse(['groups' => $result]);
+	}
+
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/users-search')]
+	public function searchAdminUsers(string $search = '', int $limit = 50): JSONResponse {
+		if ($err = $this->checkAdmin()) {
+			return $err;
+		}
+
+		$search = trim($search);
+		if ($search === '') {
+			return new JSONResponse(['users' => []]);
+		}
+
+		$users = $this->userManager->search($search, $limit);
+		$result = [];
+		foreach ($users as $user) {
+			if ($user instanceof IUser) {
+				$result[] = [
+					'id' => $user->getUID(),
+					'uid' => $user->getUID(),
+					'displayName' => $user->getDisplayName(),
+					'email' => $user->getEMailAddress() ?: '',
+				];
+			}
+		}
+
+		return new JSONResponse(['users' => $result]);
 	}
 
 	// ==========================================
@@ -657,6 +785,31 @@ class GroupApiController extends Controller {
 			];
 		}
 		return $list;
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function enrichRequest(CustomGroupRequest $r): array {
+		$candUser = $this->userManager->get((string)$r->getCandidateId());
+		$reqUser = $this->userManager->get((string)$r->getRequesterId());
+		$procUser = $r->getProcessedBy() ? $this->userManager->get((string)$r->getProcessedBy()) : null;
+
+		return [
+			'id' => $r->getId(),
+			'group_id' => $r->getGroupId(),
+			'candidate_id' => $r->getCandidateId(),
+			'candidate_displayName' => $candUser ? $candUser->getDisplayName() : $r->getCandidateId(),
+			'candidate_email' => ($candUser && $candUser->getEMailAddress()) ? $candUser->getEMailAddress() : '',
+			'requester_id' => $r->getRequesterId(),
+			'requester_displayName' => $reqUser ? $reqUser->getDisplayName() : $r->getRequesterId(),
+			'status' => $r->getStatus(),
+			'created_at' => $r->getCreatedAt()?->format(DateTime::ATOM),
+			'updated_at' => $r->getUpdatedAt()?->format(DateTime::ATOM),
+			'processed_by' => $r->getProcessedBy(),
+			'processed_by_displayName' => $procUser ? $procUser->getDisplayName() : ($r->getProcessedBy() ?? ''),
+			'processed_by_email' => ($procUser && $procUser->getEMailAddress()) ? $procUser->getEMailAddress() : '',
+		];
 	}
 
 	/**

@@ -3,7 +3,7 @@
 		<NcAppNavigation>
 			<template #list>
 				<!-- Create Group Button -->
-				<div class="nav-header-actions">
+				<div v-if="canCreateGroups" class="nav-header-actions">
 					<NcButton
 						type="primary"
 						wide
@@ -84,7 +84,7 @@
 							{{ selectedGroup.name }}
 						</h1>
 						<div class="group-meta">
-							<span class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
+							<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
 							<span class="meta-tag creator-tag">
 								Создатель: {{ selectedGroup.creator_displayName }}
 								<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
@@ -96,8 +96,8 @@
 							<span v-else-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
 						</div>
 
-						<!-- Delegations Metadata Section -->
-						<div class="delegation-meta-box">
+						<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
+						<div v-if="hasDelegates" class="delegation-meta-box">
 							<div class="delegation-line">
 								<span class="delegation-label">Делегаты с правами «Управление»:</span>
 								<span v-if="selectedGroup.delegates_manage?.length > 0" class="delegates-tags">
@@ -148,65 +148,82 @@
 					</div>
 				</header>
 
-				<!-- Pending Membership Requests Section (for Owners, Delegates, Admin) -->
+				<!-- Membership Requests Section (for Owners, Delegates, Admin) -->
 				<section v-if="selectedGroup.permissions?.can_moderate_requests" class="group-requests-section">
 					<div class="requests-header">
 						<h2>
 							Запросы на добавление участников
 							<span v-if="pendingRequestsCount > 0" class="pending-badge">{{ pendingRequestsCount }}</span>
 						</h2>
-						<NcButton
-							type="tertiary-no-background"
-							size="small"
-							@click="fetchGroupRequests">
-							Обновить заявки
-						</NcButton>
+						<div class="requests-header-actions">
+							<NcButton
+								type="secondary"
+								size="small"
+								@click="showHistoryModal = true">
+								История запросов
+							</NcButton>
+							<NcButton
+								type="tertiary-no-background"
+								size="small"
+								@click="fetchGroupRequests">
+								Обновить заявки
+							</NcButton>
+						</div>
 					</div>
 
 					<div v-if="loadingRequests" class="loading-requests">
 						<NcLoadingIcon :size="20" /> Загрузка запросов...
 					</div>
-					<div v-else-if="groupRequests.length === 0" class="no-requests-hint">
+					<div v-else-if="inlineGroupRequests.length === 0" class="no-requests-hint">
 						Нет активных запросов на рассмотрение
 					</div>
 					<div v-else class="requests-list">
 						<div
-							v-for="req in groupRequests"
+							v-for="req in inlineGroupRequests"
 							:key="req.id"
 							class="request-card"
-							:class="req.status">
-							<div class="request-candidate">
-								<span class="candidate-name">{{ req.candidate_displayName }}</span>
-								<span class="candidate-email">{{ req.candidate_email || ('@' + req.candidate_id) }}</span>
+							:class="'status-' + req.status">
+							<div class="request-main-row">
+								<div class="request-candidate">
+									<span class="candidate-name">{{ req.candidate_displayName }}</span>
+									<span class="candidate-email">{{ req.candidate_email || ('@' + req.candidate_id) }}</span>
+								</div>
+
+								<div class="request-status-actions">
+									<template v-if="req.status === 'pending'">
+										<NcButton
+											type="primary"
+											size="small"
+											:disabled="processingRequestId === req.id"
+											@click="approveRequest(req.id)">
+											Принять
+										</NcButton>
+										<NcButton
+											type="error"
+											size="small"
+											:disabled="processingRequestId === req.id"
+											@click="rejectRequest(req.id)">
+											Отклонить
+										</NcButton>
+									</template>
+									<span v-else-if="req.status === 'approved'" class="status-badge status-approved">
+										✓ Одобрен
+									</span>
+									<span v-else-if="req.status === 'rejected'" class="status-badge status-rejected">
+										✕ Отклонен
+									</span>
+								</div>
 							</div>
 
-							<div class="request-meta">
-								<span class="request-author">Запросил: {{ req.requester_displayName }}</span>
-								<span class="request-date">{{ formatDate(req.created_at) }}</span>
-							</div>
-
-							<div class="request-status-actions">
-								<template v-if="req.status === 'pending'">
-									<NcButton
-										type="primary"
-										size="small"
-										:disabled="processingRequestId === req.id"
-										@click="approveRequest(req.id)">
-										Принять
-									</NcButton>
-									<NcButton
-										type="error"
-										size="small"
-										:disabled="processingRequestId === req.id"
-										@click="rejectRequest(req.id)">
-										Отклонить
-									</NcButton>
-								</template>
-								<span v-else-if="req.status === 'approved'" class="status-badge status-approved">
-									Принят
+							<div class="request-meta-row">
+								<span class="request-author">
+									Предложил: <strong>{{ req.requester_displayName }}</strong> ({{ '@' + req.requester_id }}) в {{ formatDate(req.created_at) }}
 								</span>
-								<span v-else-if="req.status === 'rejected'" class="status-badge status-rejected">
-									Отклонен
+								<span v-if="req.status !== 'pending' && req.processed_by" class="request-resolver">
+									{{ req.status === 'approved' ? 'Одобрил' : 'Отклонил' }}:
+									<strong>{{ req.processed_by_displayName || req.processed_by }}</strong>
+									<template v-if="req.processed_by_email || req.processed_by">({{ req.processed_by_email || ('@' + req.processed_by) }})</template>
+									в {{ formatDate(req.updated_at) }}
 								</span>
 							</div>
 						</div>
@@ -280,6 +297,7 @@
 					description="Выберите группу из списка слева или создайте новую для предоставления доступа к папкам и файлам">
 					<template #action>
 						<NcButton
+							v-if="canCreateGroups"
 							type="primary"
 							@click="openCreateModal">
 							Создать группу
@@ -312,6 +330,13 @@
 			@close="showRequestModal = false"
 			@submitted="onRequestSubmitted" />
 
+		<!-- Request History Modal -->
+		<RequestHistoryModal
+			v-if="selectedGroup"
+			:show="showHistoryModal"
+			:group="selectedGroup"
+			@close="showHistoryModal = false" />
+
 		<!-- Delete Confirm Modal -->
 		<ConfirmModal
 			:show="showDeleteModal"
@@ -340,6 +365,7 @@ import axios from '@nextcloud/axios'
 import GroupModal from './components/GroupModal.vue'
 import DelegationModal from './components/DelegationModal.vue'
 import RequestMemberModal from './components/RequestMemberModal.vue'
+import RequestHistoryModal from './components/RequestHistoryModal.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import type { AppState, CustomGroup, MembershipRequest } from './types'
 
@@ -347,11 +373,13 @@ import type { AppState, CustomGroup, MembershipRequest } from './types'
 const initialState = loadState<AppState>('customusergroups', 'customusergroups-state', {
 	current_user_id: null,
 	is_admin: false,
+	can_create_groups: true,
 	groups: [],
 })
 
 const currentUserId = ref(initialState.current_user_id)
 const isAdmin = ref(initialState.is_admin)
+const canCreateGroups = ref(initialState.can_create_groups ?? true)
 const allGroups = ref<CustomGroup[]>(initialState.groups || [])
 const selectedGroupId = ref<string | null>(
 	allGroups.value.length > 0 ? allGroups.value[0].group_id : null,
@@ -367,6 +395,7 @@ const showGroupModal = ref(false)
 const modalGroup = ref<CustomGroup | null>(null)
 const showDelegationModal = ref(false)
 const showRequestModal = ref(false)
+const showHistoryModal = ref(false)
 const showDeleteModal = ref(false)
 const groupToDelete = ref<CustomGroup | null>(null)
 const deleting = ref(false)
@@ -375,6 +404,13 @@ const deleting = ref(false)
 const groupRequests = ref<MembershipRequest[]>([])
 const loadingRequests = ref(false)
 const processingRequestId = ref<number | null>(null)
+
+onMounted(async () => {
+	await reloadGroups()
+	if (selectedGroupId.value && selectedGroup.value?.permissions?.can_moderate_requests) {
+		await fetchGroupRequests()
+	}
+})
 
 // Filter groups
 const myGroups = computed(() => {
@@ -412,8 +448,33 @@ const selectedGroup = computed(() => {
 	return allGroups.value.find((g) => g.group_id === selectedGroupId.value) || null
 })
 
+const hasDelegates = computed(() => {
+	const g = selectedGroup.value
+	if (!g) return false
+	return (g.delegates_manage && g.delegates_manage.length > 0)
+		|| (g.delegates_moderate && g.delegates_moderate.length > 0)
+})
+
 const pendingRequestsCount = computed(() => {
 	return groupRequests.value.filter((r) => r.status === 'pending').length
+})
+
+// Requests displayed inline in group view:
+// - All pending requests for all time
+// - Approved and rejected requests only for the last 24 hours
+const inlineGroupRequests = computed(() => {
+	const now = Date.now()
+	const oneDayMs = 24 * 60 * 60 * 1000
+	return groupRequests.value.filter((r) => {
+		if (r.status === 'pending') {
+			return true
+		}
+		if (r.updated_at) {
+			const updatedTime = new Date(r.updated_at).getTime()
+			return (now - updatedTime) <= oneDayMs
+		}
+		return false
+	})
 })
 
 const filteredMembers = computed(() => {
@@ -437,10 +498,13 @@ function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
 function selectGroup(groupId: string) {
 	selectedGroupId.value = groupId
 	memberSearchQuery.value = ''
+	if (selectedGroup.value?.permissions?.can_moderate_requests) {
+		fetchGroupRequests()
+	}
 }
 
 watch(
-	() => selectedGroupId.value,
+	() => selectedGroup.value?.group_id,
 	(newGid) => {
 		if (newGid && selectedGroup.value?.permissions?.can_moderate_requests) {
 			fetchGroupRequests()
@@ -516,10 +580,15 @@ async function approveRequest(requestId: number) {
 	processingRequestId.value = requestId
 	try {
 		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/approve`)
-		await axios.post(url)
+		const response = await axios.post(url)
+		if (response.data && response.data.request) {
+			const idx = groupRequests.value.findIndex((r) => r.id === requestId)
+			if (idx !== -1) {
+				groupRequests.value[idx] = response.data.request
+			}
+		}
 		showSuccess('Запрос одобрен, пользователь добавлен в группу')
 		await reloadGroups()
-		await fetchGroupRequests()
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
 		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка одобрения запроса'
@@ -534,9 +603,14 @@ async function rejectRequest(requestId: number) {
 	processingRequestId.value = requestId
 	try {
 		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/reject`)
-		await axios.post(url)
+		const response = await axios.post(url)
+		if (response.data && response.data.request) {
+			const idx = groupRequests.value.findIndex((r) => r.id === requestId)
+			if (idx !== -1) {
+				groupRequests.value[idx] = response.data.request
+			}
+		}
 		showSuccess('Запрос отклонен')
-		await fetchGroupRequests()
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
 		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка отклонения запроса'
@@ -567,7 +641,7 @@ async function confirmDelete() {
 	}
 }
 
-function formatDate(dateStr: string) {
+function formatDate(dateStr?: string | null) {
 	if (!dateStr) return ''
 	try {
 		const d = new Date(dateStr)
@@ -591,6 +665,7 @@ async function reloadGroups() {
 		if (res.data && Array.isArray(res.data.groups)) {
 			allGroups.value = res.data.groups
 			isAdmin.value = res.data.isAdmin
+			canCreateGroups.value = res.data.canCreateGroups ?? true
 			currentUserId.value = res.data.currentUserId
 		}
 	} catch (err) {
@@ -599,24 +674,15 @@ async function reloadGroups() {
 		loadingGroups.value = false
 	}
 }
-
-onMounted(() => {
-	reloadGroups()
-})
 </script>
 
 <style scoped>
 .nav-header-actions {
-	padding: 12px 14px 8px;
-}
-
-.icon-plus {
-	font-weight: bold;
-	margin-right: 4px;
+	padding: 10px 14px;
 }
 
 .nav-search-wrapper {
-	padding: 0 14px 10px;
+	padding: 0 14px 10px 14px;
 }
 
 .nav-divider {
@@ -640,7 +706,8 @@ onMounted(() => {
 
 .group-details-container {
 	padding: 24px 32px;
-	max-width: 1040px;
+	max-width: 900px;
+	margin: 0 auto;
 }
 
 .group-header {
@@ -670,7 +737,7 @@ onMounted(() => {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 10px;
+	gap: 8px;
 }
 
 .meta-tag {
@@ -794,6 +861,12 @@ onMounted(() => {
 	gap: 8px;
 }
 
+.requests-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .pending-badge {
 	background-color: var(--color-error);
 	color: #fff;
@@ -814,17 +887,31 @@ onMounted(() => {
 .requests-list {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 }
 
 .request-card {
 	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	flex-direction: column;
+	gap: 6px;
 	padding: 10px 14px;
 	background-color: var(--color-main-background);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
+}
+
+.request-card.status-approved {
+	border-left: 4px solid var(--color-success);
+}
+
+.request-card.status-rejected {
+	border-left: 4px solid var(--color-error);
+}
+
+.request-main-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 }
 
 .request-candidate {
@@ -843,11 +930,13 @@ onMounted(() => {
 	color: var(--color-text-maxcontrast);
 }
 
-.request-meta {
+.request-meta-row {
 	display: flex;
-	flex-direction: column;
-	font-size: 12px;
+	flex-wrap: wrap;
+	justify-content: space-between;
+	font-size: 11px;
 	color: var(--color-text-maxcontrast);
+	gap: 6px;
 }
 
 .request-status-actions {
@@ -859,18 +948,20 @@ onMounted(() => {
 .status-badge {
 	font-size: 11px;
 	font-weight: 600;
-	padding: 2px 8px;
+	padding: 3px 8px;
 	border-radius: 10px;
 }
 
 .status-approved {
-	background-color: var(--color-success-element);
-	color: #fff;
+	background-color: rgba(70, 186, 97, 0.15);
+	color: var(--color-success);
+	border: 1px solid var(--color-success);
 }
 
 .status-rejected {
-	background-color: var(--color-text-maxcontrast);
-	color: #fff;
+	background-color: rgba(224, 76, 56, 0.15);
+	color: var(--color-error);
+	border: 1px solid var(--color-error);
 }
 
 /* Members Section */
@@ -903,28 +994,28 @@ onMounted(() => {
 }
 
 .empty-members-list {
-	padding: 32px;
+	padding: 24px;
 	text-align: center;
+	font-size: 13px;
 	color: var(--color-text-maxcontrast);
-	font-size: 14px;
 	background: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
 }
 
 .members-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-	gap: 14px;
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+	gap: 12px;
 }
 
 .member-card {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 12px 14px;
+	padding: 10px 14px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
-	background-color: var(--color-main-background);
+	background: var(--color-main-background);
 	position: relative;
 }
 
@@ -932,13 +1023,13 @@ onMounted(() => {
 	width: 36px;
 	height: 36px;
 	border-radius: 50%;
-	background-color: var(--color-primary-element-light);
-	color: var(--color-primary-element-light-text);
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text);
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	font-weight: 600;
-	font-size: 16px;
+	font-weight: bold;
+	font-size: 15px;
 	flex-shrink: 0;
 }
 
@@ -950,8 +1041,8 @@ onMounted(() => {
 }
 
 .member-display-name {
+	font-size: 13px;
 	font-weight: 600;
-	font-size: 14px;
 	color: var(--color-main-text);
 	white-space: nowrap;
 	overflow: hidden;
@@ -959,7 +1050,7 @@ onMounted(() => {
 }
 
 .member-email {
-	font-size: 12px;
+	font-size: 11px;
 	color: var(--color-text-maxcontrast);
 	white-space: nowrap;
 	overflow: hidden;
@@ -967,37 +1058,36 @@ onMounted(() => {
 }
 
 .member-card-badges {
+	position: absolute;
+	top: 6px;
+	right: 8px;
 	display: flex;
-	flex-direction: column;
 	gap: 4px;
-	align-items: flex-end;
 }
 
 .member-badge {
-	font-size: 10px;
-	padding: 2px 6px;
-	border-radius: 8px;
+	font-size: 9px;
 	font-weight: 600;
-	white-space: nowrap;
+	padding: 1px 5px;
+	border-radius: 6px;
 }
 
 .creator-tag {
-	background-color: var(--color-background-hover);
-	color: var(--color-text-maxcontrast);
+	background: var(--color-success-element);
+	color: var(--color-success-element-text);
 }
 
 .manage-tag {
-	background-color: var(--color-warning-element-light, #fff2d6);
-	color: var(--color-warning-element-light-text, #915d00);
-	border: 1px solid var(--color-warning-element, #e29300);
+	background: var(--color-warning-element, #e29300);
+	color: #fff;
 }
 
 .moderate-tag {
-	background-color: var(--color-primary-element-light);
-	color: var(--color-primary-element-light-text);
-	border: 1px solid var(--color-primary-element);
+	background: var(--color-info-element, #0082c9);
+	color: #fff;
 }
 
+/* Empty State */
 .empty-state-wrapper {
 	display: flex;
 	align-items: center;
