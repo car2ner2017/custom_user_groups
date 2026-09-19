@@ -79,72 +79,74 @@
 			<!-- Group Details -->
 			<div v-if="selectedGroup" class="group-details-container">
 				<header class="group-header">
-					<div class="group-title-section">
-						<h1 class="group-name">
-							{{ selectedGroup.name }}
-						</h1>
-						<div class="group-meta">
-							<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
-							<span class="meta-tag creator-tag">
-								Создатель: {{ selectedGroup.creator_displayName }}
-								<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
-							</span>
-							<span class="meta-tag date-tag">Создана: {{ formatDate(selectedGroup.created_at) }}</span>
-							<span v-if="selectedGroup.is_creator" class="role-badge creator-badge">Вы создатель</span>
-							<span v-else-if="isAdmin" class="role-badge admin-badge">Вы Администратор</span>
-							<span v-else-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">Вы управляющий</span>
-							<span v-else-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
+					<div class="group-title-section" :class="{ 'has-delegates': hasDelegates }">
+						<div class="group-title-info">
+							<h1 class="group-name">
+								{{ selectedGroup.name }}
+							</h1>
+							<div class="group-meta">
+								<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
+								<span class="meta-tag creator-tag">
+									Создатель: {{ selectedGroup.creator_displayName }}
+									<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
+								</span>
+								<span class="meta-tag date-tag">Создана: {{ formatDate(selectedGroup.created_at) }}</span>
+								<span v-if="selectedGroup.is_creator" class="role-badge creator-badge">Вы создатель</span>
+								<span v-else-if="isAdmin" class="role-badge admin-badge">Вы Администратор</span>
+								<span v-else-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">Вы управляющий</span>
+								<span v-else-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
+							</div>
 						</div>
 
-						<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
-						<div v-if="hasDelegates" class="delegation-meta-box">
-							<div class="delegation-line">
-								<span class="delegation-label">Делегаты с правами «Управление»:</span>
-								<span v-if="selectedGroup.delegates_manage?.length > 0" class="delegates-tags">
-									<span
-										v-for="d in selectedGroup.delegates_manage"
-										:key="d.user_id"
-										class="delegate-chip manage-chip">
-										{{ d.displayName }} ({{ d.email || d.user_id }})
-									</span>
-								</span>
-								<span v-else class="no-delegates">Нет делегатов</span>
-							</div>
-
-							<div class="delegation-line">
-								<span class="delegation-label">Делегаты с правами «Модерация»:</span>
-								<span v-if="selectedGroup.delegates_moderate?.length > 0" class="delegates-tags">
-									<span
-										v-for="d in selectedGroup.delegates_moderate"
-										:key="d.user_id"
-										class="delegate-chip moderate-chip">
-										{{ d.displayName }} ({{ d.email || d.user_id }})
-									</span>
-								</span>
-								<span v-else class="no-delegates">Нет делегатов</span>
-							</div>
+						<div class="group-header-actions">
+							<NcButton
+								v-if="selectedGroup.permissions?.can_delegate"
+								type="tertiary"
+								@click="openDelegationModal">
+								Права управления
+							</NcButton>
+							<NcButton
+								v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
+								type="secondary"
+								@click="openEditModal(selectedGroup)">
+								Редактировать
+							</NcButton>
+							<NcButton
+								v-if="selectedGroup.permissions?.can_delete"
+								type="error"
+								@click="openDeleteModal(selectedGroup)">
+								Удалить
+							</NcButton>
 						</div>
 					</div>
 
-					<div class="group-header-actions">
-						<NcButton
-							v-if="selectedGroup.permissions?.can_delegate"
-							type="tertiary"
-							@click="openDelegationModal">
-							Права управления
-						</NcButton>
-						<NcButton
-							v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
-							type="secondary"
-							@click="openEditModal(selectedGroup)">
-							Редактировать
-						</NcButton>
-						<NcButton
-							v-if="selectedGroup.permissions?.can_delete"
-							type="error"
-							@click="openDeleteModal(selectedGroup)">
-							Удалить
-						</NcButton>
+					<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
+					<div v-if="hasDelegates" class="delegation-meta-box">
+						<div class="delegation-line">
+							<span class="delegation-label">Делегаты с правами «Управление»:</span>
+							<span v-if="selectedGroup.delegates_manage?.length > 0" class="delegates-tags">
+								<span
+									v-for="d in selectedGroup.delegates_manage"
+									:key="d.user_id"
+									class="delegate-chip manage-chip">
+									{{ d.displayName }} ({{ d.email || d.user_id }})
+								</span>
+							</span>
+							<span v-else class="no-delegates">Нет делегатов</span>
+						</div>
+
+						<div class="delegation-line">
+							<span class="delegation-label">Делегаты с правами «Модерация»:</span>
+							<span v-if="selectedGroup.delegates_moderate?.length > 0" class="delegates-tags">
+								<span
+									v-for="d in selectedGroup.delegates_moderate"
+									:key="d.user_id"
+									class="delegate-chip moderate-chip">
+									{{ d.displayName }} ({{ d.email || d.user_id }})
+								</span>
+							</span>
+							<span v-else class="no-delegates">Нет делегатов</span>
+						</div>
 					</div>
 				</header>
 
@@ -236,7 +238,14 @@
 						<div class="members-header-title">
 							<h2>Участники группы ({{ selectedGroup.member_count }})</h2>
 							<NcButton
-								v-if="selectedGroup.permissions?.can_request_member"
+								v-if="canDirectAddMembers"
+								type="primary"
+								size="small"
+								@click="openAddMemberModal">
+								Добавить участника
+							</NcButton>
+							<NcButton
+								v-else-if="selectedGroup.permissions?.can_request_member"
 								type="tertiary"
 								size="small"
 								@click="openRequestMemberModal">
@@ -322,6 +331,14 @@
 			@close="showDelegationModal = false"
 			@updated="onDelegationUpdated" />
 
+		<!-- Add Member Modal -->
+		<AddMemberModal
+			v-if="selectedGroup"
+			:show="showAddMemberModal"
+			:group="selectedGroup"
+			@close="showAddMemberModal = false"
+			@saved="onDirectMembersAdded" />
+
 		<!-- Request Member Modal -->
 		<RequestMemberModal
 			v-if="selectedGroup"
@@ -363,6 +380,7 @@ import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import axios from '@nextcloud/axios'
 import GroupModal from './components/GroupModal.vue'
+import AddMemberModal from './components/AddMemberModal.vue'
 import DelegationModal from './components/DelegationModal.vue'
 import RequestMemberModal from './components/RequestMemberModal.vue'
 import RequestHistoryModal from './components/RequestHistoryModal.vue'
@@ -393,6 +411,7 @@ const loadingGroups = ref(false)
 // Modals state
 const showGroupModal = ref(false)
 const modalGroup = ref<CustomGroup | null>(null)
+const showAddMemberModal = ref(false)
 const showDelegationModal = ref(false)
 const showRequestModal = ref(false)
 const showHistoryModal = ref(false)
@@ -489,6 +508,14 @@ const filteredMembers = computed(() => {
 	)
 })
 
+const canDirectAddMembers = computed(() => {
+	if (!selectedGroup.value) return false
+	if (selectedGroup.value.is_creator || isAdmin.value) return true
+	const level = selectedGroup.value.permissions?.delegation_level
+	if (level === 'manage' || level === 'moderate') return true
+	return !!selectedGroup.value.permissions?.can_edit_members
+})
+
 function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
 	if (!selectedGroup.value?.delegations) return null
 	const del = selectedGroup.value.delegations.find((d) => d.user_id === uid)
@@ -529,8 +556,16 @@ function openDelegationModal() {
 	showDelegationModal.value = true
 }
 
+function openAddMemberModal() {
+	showAddMemberModal.value = true
+}
+
 function openRequestMemberModal() {
 	showRequestModal.value = true
+}
+
+async function onDirectMembersAdded() {
+	await reloadGroups()
 }
 
 function openDeleteModal(group: CustomGroup) {
@@ -712,14 +747,26 @@ async function reloadGroups() {
 
 .group-header {
 	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
+	flex-direction: column;
 	padding-bottom: 20px;
 	border-bottom: 1px solid var(--color-border);
-	gap: 20px;
+	gap: 16px;
 }
 
 .group-title-section {
+	display: flex;
+	justify-content: space-between;
+	align-items: flex-start;
+	gap: 20px;
+	width: 100%;
+}
+
+.group-title-section.has-delegates {
+	border-bottom: 1px solid var(--color-border);
+	padding-bottom: 16px;
+}
+
+.group-title-info {
 	display: flex;
 	flex-direction: column;
 	gap: 10px;
@@ -782,7 +829,8 @@ async function reloadGroups() {
 	padding: 10px 14px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
-	margin-top: 4px;
+	width: 100%;
+	box-sizing: border-box;
 }
 
 .delegation-line {
@@ -1094,5 +1142,17 @@ async function reloadGroups() {
 	justify-content: center;
 	height: 100%;
 	padding: 40px;
+}
+
+@media (max-width: 768px) {
+	.group-title-section {
+		flex-direction: column;
+		gap: 12px;
+	}
+
+	.group-header-actions {
+		width: 100%;
+		justify-content: flex-start;
+	}
 }
 </style>

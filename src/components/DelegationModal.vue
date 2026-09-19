@@ -1,10 +1,14 @@
 <template>
 	<NcModal
 		v-if="show"
-		name="Делегирование прав управления группой"
+		:name="''"
 		size="normal"
 		@close="$emit('close')">
 		<div class="delegation-modal-content">
+			<h2 class="form-title">
+				Делегирование прав управления группой
+			</h2>
+
 			<p class="delegation-description">
 				Вы можете делегировать права управления или модерации группы <strong>только действующим участникам</strong> этой группы.
 			</p>
@@ -94,9 +98,6 @@
 					<div class="user-item-info">
 						<span class="user-displayname">
 							{{ member.displayName }}
-							<span v-if="getMemberDelegationLevel(member.uid)" class="already-delegated-tag">
-								({{ getMemberDelegationLevel(member.uid) === 'manage' ? 'Управление' : 'Модерация' }})
-							</span>
 						</span>
 						<span class="user-email-uid">{{ member.email || ('@' + member.uid) }}</span>
 					</div>
@@ -194,8 +195,9 @@ const filteredDelegations = computed(() => {
 const filteredMembers = computed(() => {
 	if (!props.group) return []
 	const creatorId = props.group.creator_id
-	// Exclude creator from delegation list
-	const members = props.group.members.filter((m) => m.uid !== creatorId)
+	const delegatedUids = new Set(delegations.value.map((d) => d.user_id))
+	// Exclude creator and any member who already has delegated rights
+	const members = props.group.members.filter((m) => m.uid !== creatorId && !delegatedUids.has(m.uid))
 	const query = memberSearchQuery.value.trim().toLowerCase()
 	if (!query) return members
 	return members.filter((m) => {
@@ -205,11 +207,6 @@ const filteredMembers = computed(() => {
 		return nameMatch || uidMatch || emailMatch
 	})
 })
-
-function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
-	const del = delegations.value.find((d) => d.user_id === uid)
-	return del ? del.level : null
-}
 
 async function fetchDelegations() {
 	loadingDelegations.value = true
@@ -273,6 +270,9 @@ async function revoke(userId: string) {
 }
 
 async function assignRights(uid: string) {
+	if (delegations.value.some((d) => d.user_id === uid)) {
+		return
+	}
 	const level = memberLevels.value[uid] || 'manage'
 	assigningUid.value = uid
 	try {
@@ -305,6 +305,13 @@ async function assignRights(uid: string) {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+}
+
+.form-title {
+	font-size: 20px;
+	font-weight: 600;
+	margin: 0;
+	color: var(--color-main-text);
 }
 
 .delegation-description {

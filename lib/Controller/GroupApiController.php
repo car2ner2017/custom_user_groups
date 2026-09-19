@@ -299,7 +299,7 @@ class GroupApiController extends Controller {
 			return $err;
 		}
 
-		$limit = min(max(1, $limit), 100);
+		$limit = min(max(1, $limit), 500);
 		$users = $this->userManager->search($search, $limit);
 
 		$result = [];

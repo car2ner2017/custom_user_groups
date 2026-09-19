@@ -1,10 +1,14 @@
 <template>
 	<NcModal
 		v-if="show"
-		:name="isEdit ? 'Редактировать группу' : 'Создать новую группу'"
+		:name="''"
 		size="normal"
 		@close="$emit('close')">
 		<form class="group-form" @submit.prevent="submitForm">
+			<h2 class="form-title">
+				{{ isEdit ? 'Редактировать группу' : 'Создать новую группу' }}
+			</h2>
+
 			<!-- Group Name Field -->
 			<div class="form-group">
 				<label for="group-name" class="form-label">
@@ -36,24 +40,23 @@
 						:disabled="loading" />
 				</div>
 
-				<!-- Selected members chips with scroll and max height -->
-				<div v-if="selectedUsers.length > 0" class="selected-chips">
+				<!-- Selected members list with scroll and max height -->
+				<div v-if="selectedUsers.length > 0" class="selected-users-list">
 					<div
 						v-for="user in filteredSelectedUsers"
 						:key="user.uid"
-						class="user-chip">
-						<span class="chip-name">
-							{{ user.displayName }}
-							<span class="chip-email">({{ user.email || user.uid }})</span>
-						</span>
-						<button
-							type="button"
-							class="chip-remove-btn"
-							title="Удалить из группы"
+						class="user-item">
+						<div class="user-item-info">
+							<span class="user-displayname">{{ user.displayName }}</span>
+							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
+						</div>
+						<NcButton
+							type="error"
+							size="small"
 							:disabled="loading"
-							@click="removeUser(user.uid)">
-							✕
-						</button>
+							@click.stop="removeUser(user.uid)">
+							- Удалить
+						</NcButton>
 					</div>
 					<div v-if="filteredSelectedUsers.length === 0" class="no-filtered-selected">
 						По запросу «{{ selectedMembersFilter }}» участники не найдены
@@ -73,7 +76,7 @@
 
 				<!-- Available users list -->
 				<div v-if="loadingUsers" class="loading-users">
-					<NcLoadingIcon :size="20" /> Поиск пользователей...
+					<NcLoadingIcon :size="20" /> Загрузка пользователей...
 				</div>
 				<div v-else-if="filteredAvailableUsers.length > 0" class="available-users-list">
 					<div
@@ -87,13 +90,15 @@
 						</div>
 						<NcButton
 							type="tertiary"
-							size="small">
+							size="small"
+							:disabled="loading"
+							@click.stop="addUser(user)">
 							+ Добавить
 						</NcButton>
 					</div>
 				</div>
-				<div v-else-if="userSearchQuery.trim() !== ''" class="empty-users">
-					Пользователи не найдены
+				<div v-else class="empty-users">
+					{{ userSearchQuery.trim() !== '' ? 'Пользователи не найдены по запросу' : 'Все доступные пользователи уже выбраны' }}
 				</div>
 			</div>
 
@@ -150,7 +155,6 @@ const availableUsers = ref<UserOption[]>([])
 const userSearchQuery = ref('')
 const loading = ref(false)
 const loadingUsers = ref(false)
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 watch(
 	() => props.show,
@@ -184,22 +188,21 @@ const filteredSelectedUsers = computed(() => {
 
 const filteredAvailableUsers = computed(() => {
 	const selectedUids = new Set(selectedUsers.value.map((u) => u.uid))
-	return availableUsers.value.filter((u) => !selectedUids.has(u.uid))
+	const unselected = availableUsers.value.filter((u) => !selectedUids.has(u.uid))
+	const query = userSearchQuery.value.trim().toLowerCase()
+	if (query === '') return unselected
+	return unselected.filter(
+		(u) =>
+			u.displayName.toLowerCase().includes(query)
+			|| u.uid.toLowerCase().includes(query)
+			|| (u.email && u.email.toLowerCase().includes(query)),
+	)
 })
 
-watch(userSearchQuery, (newQuery) => {
-	if (searchTimeout) {
-		clearTimeout(searchTimeout)
-	}
-	searchTimeout = setTimeout(() => {
-		fetchUsers(newQuery.trim())
-	}, 300)
-})
-
-async function fetchUsers(search: string) {
+async function fetchUsers() {
 	loadingUsers.value = true
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/users', { search, limit: 30 })
+		const url = generateUrl('/apps/customusergroups/api/v1/users', { search: '', limit: 500 })
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.users)) {
 			availableUsers.value = response.data.users
@@ -283,6 +286,13 @@ async function submitForm() {
 	color: var(--color-error);
 }
 
+.form-title {
+	font-size: 20px;
+	font-weight: 600;
+	margin: 0;
+	color: var(--color-main-text);
+}
+
 .help-text {
 	font-size: 12px;
 	color: var(--color-text-maxcontrast);
@@ -296,59 +306,13 @@ async function submitForm() {
 	margin-bottom: 6px;
 }
 
-.selected-chips {
+.selected-users-list {
 	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	padding: 8px;
-	background-color: var(--color-background-hover);
-	border-radius: var(--border-radius-element);
+	flex-direction: column;
 	max-height: 160px;
 	overflow-y: auto;
 	border: 1px solid var(--color-border);
-}
-
-.user-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 10px;
-	background-color: var(--color-primary-element-light);
-	color: var(--color-primary-element-light-text);
-	border-radius: 16px;
-	font-size: 13px;
-	max-width: 100%;
-}
-
-.chip-name {
-	font-weight: 500;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-
-.chip-email {
-	font-size: 11px;
-	opacity: 0.85;
-	margin-left: 3px;
-}
-
-.chip-remove-btn {
-	border: none;
-	background: transparent;
-	color: inherit;
-	cursor: pointer;
-	font-size: 12px;
-	line-height: 1;
-	padding: 0;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	opacity: 0.7;
-}
-
-.chip-remove-btn:hover {
-	opacity: 1;
+	border-radius: var(--border-radius-element);
 }
 
 .no-members-hint,

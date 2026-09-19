@@ -1,10 +1,14 @@
 <template>
 	<NcModal
 		v-if="show"
-		:name="'История запросов группы «' + group.name + '»'"
+		:name="''"
 		size="large"
 		@close="$emit('close')">
 		<div class="history-modal-content">
+			<h2 class="form-title">
+				История запросов группы «{{ group.name }}»
+			</h2>
+
 			<div class="filters-bar">
 				<div class="status-tabs">
 					<button
@@ -204,6 +208,13 @@ function formatDate(dateStr?: string | null): string {
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
+}
+
+.form-title {
+	font-size: 20px;
+	font-weight: 600;
+	margin: 0;
+	color: var(--color-main-text);
 }
 
 .filters-bar {

@@ -79,6 +79,10 @@ class CustomGroupDelegationMapper extends QBMapper {
 		$qb->executeStatement();
 	}
 
+	public function revokeDelegation(string $groupId, string $userId): void {
+		$this->removeDelegation($groupId, $userId);
+	}
+
 	public function removeGroupDelegations(string $groupId): void {
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())

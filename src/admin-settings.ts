@@ -6,4 +6,3 @@ if (container) {
 	const app = createApp(AdminSettingsApp)
 	app.mount(container)
 }
-
