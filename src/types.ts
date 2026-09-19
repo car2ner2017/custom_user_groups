@@ -72,6 +72,15 @@ export interface CustomGroup {
 	permissions: GroupPermissions
 }
 
+export interface GroupActivityDetails {
+	old_name?: string
+	new_name?: string
+	old_owner?: string
+	new_owner?: string
+	level?: 'manage' | 'moderate'
+	[key: string]: unknown
+}
+
 export interface GroupActivity {
 	id: number
 	group_id: string
@@ -82,7 +91,7 @@ export interface GroupActivity {
 	target_id?: string | null
 	target_displayName?: string | null
 	target_email?: string | null
-	details?: Record<string, any> | null
+	details?: GroupActivityDetails | null
 	description: string
 	created_at: string
 }

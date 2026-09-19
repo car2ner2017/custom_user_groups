@@ -434,4 +434,3 @@ function formatDate(dateStr?: string | null): string {
 	margin-top: 8px;
 }
 </style>
-

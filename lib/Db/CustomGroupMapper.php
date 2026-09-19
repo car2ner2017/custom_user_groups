@@ -247,14 +247,20 @@ class CustomGroupMapper extends QBMapper {
 			->addOrderBy('id', 'ASC');
 
 		if (!$isAdmin && $forUserId !== null) {
-			// Find group_ids where user is creator, owner or member
+			// Find group_ids where user is owner or member (creator alone without ownership/membership does not grant access)
 			$subQb = $this->db->getQueryBuilder();
 			$subQb->selectDistinct('group_id')
 				->from($this->getTableName())
 				->where(
 					$subQb->expr()->orX(
-						$subQb->expr()->eq('creator_id', $subQb->createNamedParameter($forUserId)),
 						$subQb->expr()->eq('owner_id', $subQb->createNamedParameter($forUserId)),
+						$subQb->expr()->andX(
+							$subQb->expr()->orX(
+								$subQb->expr()->isNull('owner_id'),
+								$subQb->expr()->eq('owner_id', $subQb->createNamedParameter(''))
+							),
+							$subQb->expr()->eq('creator_id', $subQb->createNamedParameter($forUserId))
+						),
 						$subQb->expr()->eq('member_id', $subQb->createNamedParameter($forUserId))
 					)
 				);

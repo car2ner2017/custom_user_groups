@@ -79,7 +79,7 @@
 			<!-- Group Details -->
 			<div v-if="selectedGroup" class="group-details-container">
 				<header class="group-header">
-					<div class="group-title-section" :class="{ 'has-delegates': hasDelegates }">
+					<div class="group-title-section">
 						<div class="group-title-info">
 							<h1 class="group-name">
 								{{ selectedGroup.name }}
@@ -104,33 +104,33 @@
 								<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
 							</div>
 						</div>
+					</div>
 
-						<div class="group-header-actions">
-							<NcButton
-								v-if="selectedGroup.permissions?.can_view_history"
-								type="tertiary"
-								@click="showActivityModal = true">
-								История действий
-							</NcButton>
-							<NcButton
-								v-if="selectedGroup.permissions?.can_delegate"
-								type="tertiary"
-								@click="openDelegationModal">
-								Права управления
-							</NcButton>
-							<NcButton
-								v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
-								type="secondary"
-								@click="openEditModal(selectedGroup)">
-								Редактировать
-							</NcButton>
-							<NcButton
-								v-if="selectedGroup.permissions?.can_delete"
-								type="error"
-								@click="openDeleteModal(selectedGroup)">
-								Удалить
-							</NcButton>
-						</div>
+					<div v-if="hasGroupActions" class="group-header-actions">
+						<NcButton
+							v-if="selectedGroup.permissions?.can_view_history"
+							type="tertiary"
+							@click="showActivityModal = true">
+							История действий
+						</NcButton>
+						<NcButton
+							v-if="selectedGroup.permissions?.can_delegate"
+							type="tertiary"
+							@click="openDelegationModal">
+							Права управления
+						</NcButton>
+						<NcButton
+							v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
+							type="secondary"
+							@click="openEditModal(selectedGroup)">
+							Редактировать
+						</NcButton>
+						<NcButton
+							v-if="selectedGroup.permissions?.can_delete"
+							type="error"
+							@click="openDeleteModal(selectedGroup)">
+							Удалить
+						</NcButton>
 					</div>
 
 					<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
@@ -462,7 +462,10 @@ onMounted(async () => {
 // Filter groups
 const myGroups = computed(() => {
 	if (!currentUserId.value) return []
-	return allGroups.value.filter((g) => (g.owner_id ? g.owner_id === currentUserId.value : g.creator_id === currentUserId.value) || g.creator_id === currentUserId.value)
+	return allGroups.value.filter((g) => {
+		const owner = g.owner_id || g.creator_id
+		return owner === currentUserId.value
+	})
 })
 
 const memberGroups = computed(() => {
@@ -500,6 +503,11 @@ const hasDelegates = computed(() => {
 	if (!g) return false
 	return (g.delegates_manage && g.delegates_manage.length > 0)
 		|| (g.delegates_moderate && g.delegates_moderate.length > 0)
+})
+
+const hasGroupActions = computed(() => {
+	const p = selectedGroup.value?.permissions
+	return Boolean(p?.can_view_history || p?.can_delegate || p?.can_edit_members || p?.can_edit_name || p?.can_delete)
 })
 
 const pendingRequestsCount = computed(() => {
@@ -601,15 +609,14 @@ function openDeleteModal(group: CustomGroup) {
 	showDeleteModal.value = true
 }
 
-function onGroupSaved(savedGroup: CustomGroup) {
-	const index = allGroups.value.findIndex((g) => g.group_id === savedGroup.group_id)
-	if (index !== -1) {
-		allGroups.value[index] = savedGroup
+async function onGroupSaved(savedGroup: CustomGroup) {
+	await reloadGroups()
+	const stillVisible = allGroups.value.some((g) => g.group_id === savedGroup.group_id)
+	if (stillVisible) {
+		selectedGroupId.value = savedGroup.group_id
 	} else {
-		allGroups.value.unshift(savedGroup)
+		selectedGroupId.value = allGroups.value.length > 0 ? allGroups.value[0].group_id : null
 	}
-	selectedGroupId.value = savedGroup.group_id
-	reloadGroups()
 }
 
 async function onDelegationUpdated() {
@@ -790,15 +797,8 @@ async function reloadGroups() {
 
 .group-title-section {
 	display: flex;
-	justify-content: space-between;
-	align-items: flex-start;
-	gap: 20px;
+	flex-direction: column;
 	width: 100%;
-}
-
-.group-title-section.has-delegates {
-	border-bottom: 1px solid var(--color-border);
-	padding-bottom: 16px;
 }
 
 .group-title-info {
@@ -919,6 +919,8 @@ async function reloadGroups() {
 
 .group-header-actions {
 	display: flex;
+	flex-direction: row;
+	align-items: center;
 	flex-wrap: wrap;
 	gap: 10px;
 }
