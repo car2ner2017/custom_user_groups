@@ -19,81 +19,122 @@
 					<!-- Allowed Users Selection -->
 					<div class="picker-group">
 						<label class="picker-label">Разрешенные пользователи ({{ createAllowedUsers.length }})</label>
-						<div class="search-picker-input">
-							<NcTextField
-								v-model="userSearchCreate"
-								placeholder="Поиск пользователей Nextcloud для добавления..."
-								size="small" />
-						</div>
 
-						<div v-if="userSearchCreate.trim() && searchUsersCreateList.length > 0" class="search-dropdown-list">
+						<!-- Selected users list -->
+						<div v-if="createAllowedUsersDetails.length > 0" class="selected-items-list">
 							<div
-								v-for="user in searchUsersCreateList"
+								v-for="user in createAllowedUsersDetails"
 								:key="user.uid"
-								class="dropdown-item"
-								@click="addCreateUser(user)">
-								<span class="user-display">{{ user.displayName }}</span>
-								<span class="user-sub">({{ user.email || user.uid }})</span>
-								<NcButton type="tertiary" size="small">
-									+ Добавить
+								class="selected-item">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeCreateUser(user.uid)">
+									- Удалить
 								</NcButton>
-							</div>
-						</div>
-
-						<div v-if="createAllowedUsersDetails.length > 0" class="selected-chips-grid">
-							<div
-								v-for="u in createAllowedUsersDetails"
-								:key="u.uid"
-								class="chip user-chip">
-								<span>{{ u.displayName }} ({{ u.email || u.uid }})</span>
-								<button type="button" class="chip-remove" @click="removeCreateUser(u.uid)">
-									✕
-								</button>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
 							Пользователи пока не добавлены
+						</div>
+
+						<!-- Search users for creation -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="userSearchCreate"
+								placeholder="Поиск пользователей Nextcloud для добавления..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available users to add -->
+						<div v-if="filteredAvailableCreateUsers.length > 0" class="available-items-list">
+							<div
+								v-for="user in filteredAvailableCreateUsers"
+								:key="user.uid"
+								class="available-item"
+								@click="addCreateUser(user)">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addCreateUser(user)">
+									+ Добавить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ userSearchCreate.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи добавлены' }}
 						</div>
 					</div>
 
 					<!-- Allowed Groups Selection -->
 					<div class="picker-group">
 						<label class="picker-label">Разрешенные группы ({{ createAllowedGroups.length }})</label>
-						<div class="search-picker-input">
-							<NcTextField
-								v-model="groupSearchCreate"
-								placeholder="Поиск групп (локальных или пользовательских)..."
-								size="small" />
-						</div>
 
-						<div v-if="groupSearchCreate.trim() && searchGroupsCreateList.length > 0" class="search-dropdown-list">
+						<!-- Selected groups list -->
+						<div v-if="createAllowedGroupsDetails.length > 0" class="selected-items-list">
 							<div
-								v-for="grp in searchGroupsCreateList"
+								v-for="grp in createAllowedGroupsDetails"
 								:key="grp.id"
-								class="dropdown-item"
-								@click="addCreateGroup(grp)">
-								<span class="group-display">{{ grp.name }}</span>
-								<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
-								<NcButton type="tertiary" size="small">
-									+ Добавить
+								class="selected-item">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeCreateGroup(grp.id)">
+									- Удалить
 								</NcButton>
-							</div>
-						</div>
-
-						<div v-if="createAllowedGroupsDetails.length > 0" class="selected-chips-grid">
-							<div
-								v-for="g in createAllowedGroupsDetails"
-								:key="g.id"
-								class="chip group-chip">
-								<span>{{ g.name }}</span>
-								<span v-if="g.is_cug" class="cug-badge-small">CUG</span>
-								<button type="button" class="chip-remove" @click="removeCreateGroup(g.id)">
-									✕
-								</button>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
 							Группы пока не добавлены
+						</div>
+
+						<!-- Search groups for creation -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="groupSearchCreate"
+								placeholder="Поиск групп Nextcloud для добавления..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available groups to add -->
+						<div v-if="filteredAvailableCreateGroups.length > 0" class="available-items-list">
+							<div
+								v-for="grp in filteredAvailableCreateGroups"
+								:key="grp.id"
+								class="available-item"
+								@click="addCreateGroup(grp)">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addCreateGroup(grp)">
+									+ Добавить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ groupSearchCreate.trim() ? 'Группы не найдены' : 'Все доступные группы добавлены' }}
 						</div>
 					</div>
 				</div>
@@ -119,81 +160,122 @@
 					<!-- Forbidden Users Selection -->
 					<div class="picker-group">
 						<label class="picker-label">Запрещенные пользователи ({{ accessForbiddenUsers.length }})</label>
-						<div class="search-picker-input">
-							<NcTextField
-								v-model="userSearchAccess"
-								placeholder="Поиск пользователей для ограничения доступа..."
-								size="small" />
-						</div>
 
-						<div v-if="userSearchAccess.trim() && searchUsersAccessList.length > 0" class="search-dropdown-list">
+						<!-- Selected forbidden users list -->
+						<div v-if="accessForbiddenUsersDetails.length > 0" class="selected-items-list">
 							<div
-								v-for="user in searchUsersAccessList"
+								v-for="user in accessForbiddenUsersDetails"
 								:key="user.uid"
-								class="dropdown-item"
-								@click="addAccessUser(user)">
-								<span class="user-display">{{ user.displayName }}</span>
-								<span class="user-sub">({{ user.email || user.uid }})</span>
-								<NcButton type="tertiary" size="small">
-									+ Запретить
+								class="selected-item item-forbidden">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeAccessUser(user.uid)">
+									- Удалить
 								</NcButton>
-							</div>
-						</div>
-
-						<div v-if="accessForbiddenUsersDetails.length > 0" class="selected-chips-grid">
-							<div
-								v-for="u in accessForbiddenUsersDetails"
-								:key="u.uid"
-								class="chip user-chip chip-forbidden">
-								<span>{{ u.displayName }} ({{ u.email || u.uid }})</span>
-								<button type="button" class="chip-remove" @click="removeAccessUser(u.uid)">
-									✕
-								</button>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
 							Пользователи пока не добавлены
+						</div>
+
+						<!-- Search users for access restriction -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="userSearchAccess"
+								placeholder="Поиск пользователей для ограничения доступа..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available users to forbid -->
+						<div v-if="filteredAvailableAccessUsers.length > 0" class="available-items-list">
+							<div
+								v-for="user in filteredAvailableAccessUsers"
+								:key="user.uid"
+								class="available-item"
+								@click="addAccessUser(user)">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addAccessUser(user)">
+									+ Запретить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ userSearchAccess.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
 						</div>
 					</div>
 
 					<!-- Forbidden Groups Selection -->
 					<div class="picker-group">
 						<label class="picker-label">Запрещенные группы ({{ accessForbiddenGroups.length }})</label>
-						<div class="search-picker-input">
-							<NcTextField
-								v-model="groupSearchAccess"
-								placeholder="Поиск групп для ограничения доступа..."
-								size="small" />
-						</div>
 
-						<div v-if="groupSearchAccess.trim() && searchGroupsAccessList.length > 0" class="search-dropdown-list">
+						<!-- Selected forbidden groups list -->
+						<div v-if="accessForbiddenGroupsDetails.length > 0" class="selected-items-list">
 							<div
-								v-for="grp in searchGroupsAccessList"
+								v-for="grp in accessForbiddenGroupsDetails"
 								:key="grp.id"
-								class="dropdown-item"
-								@click="addAccessGroup(grp)">
-								<span class="group-display">{{ grp.name }}</span>
-								<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
-								<NcButton type="tertiary" size="small">
-									+ Запретить
+								class="selected-item item-forbidden">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeAccessGroup(grp.id)">
+									- Удалить
 								</NcButton>
-							</div>
-						</div>
-
-						<div v-if="accessForbiddenGroupsDetails.length > 0" class="selected-chips-grid">
-							<div
-								v-for="g in accessForbiddenGroupsDetails"
-								:key="g.id"
-								class="chip group-chip chip-forbidden">
-								<span>{{ g.name }}</span>
-								<span v-if="g.is_cug" class="cug-badge-small">CUG</span>
-								<button type="button" class="chip-remove" @click="removeAccessGroup(g.id)">
-									✕
-								</button>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
 							Группы пока не добавлены
+						</div>
+
+						<!-- Search groups for access restriction -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="groupSearchAccess"
+								placeholder="Поиск групп для ограничения доступа..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available groups to forbid -->
+						<div v-if="filteredAvailableAccessGroups.length > 0" class="available-items-list">
+							<div
+								v-for="grp in filteredAvailableAccessGroups"
+								:key="grp.id"
+								class="available-item"
+								@click="addAccessGroup(grp)">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addAccessGroup(grp)">
+									+ Запретить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ groupSearchAccess.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
 						</div>
 					</div>
 				</div>
@@ -209,14 +291,14 @@
 				<template #icon>
 					<NcLoadingIcon v-if="saving" :size="16" />
 				</template>
-				{{ saving ? 'Сохранение...' : 'Сохранить настройки' }}
+				{{ saving ? 'Сохранить настройки' : 'Сохранить настройки' }}
 			</NcButton>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcButton from '@nextcloud/vue/components/NcButton'
@@ -251,27 +333,43 @@ const accessForbiddenGroups = ref<string[]>(initialData.access_forbidden_groups 
 const accessForbiddenUsersDetails = ref<UserOption[]>([])
 const accessForbiddenGroupsDetails = ref<GroupOption[]>([])
 
+const allSystemUsers = ref<UserOption[]>([])
 const allSystemGroups = ref<GroupOption[]>([])
 const saving = ref(false)
 
-// Searches
+// Search fields
 const userSearchCreate = ref('')
-const usersFoundCreate = ref<UserOption[]>([])
 const groupSearchCreate = ref('')
-
 const userSearchAccess = ref('')
-const usersFoundAccess = ref<UserOption[]>([])
 const groupSearchAccess = ref('')
-
-let timerUserCreate: ReturnType<typeof setTimeout> | null = null
-let timerUserAccess: ReturnType<typeof setTimeout> | null = null
 
 onMounted(async () => {
 	await Promise.all([
 		fetchSettings(),
+		fetchAllUsers(),
 		fetchAllGroups(),
 	])
 })
+
+function mergeUsers(users: UserOption[]) {
+	const existing = new Set(allSystemUsers.value.map((u) => u.uid))
+	for (const u of users) {
+		if (!existing.has(u.uid)) {
+			allSystemUsers.value.push(u)
+			existing.add(u.uid)
+		}
+	}
+}
+
+function mergeGroups(groups: GroupOption[]) {
+	const existing = new Set(allSystemGroups.value.map((g) => g.id))
+	for (const g of groups) {
+		if (!existing.has(g.id)) {
+			allSystemGroups.value.push(g)
+			existing.add(g.id)
+		}
+	}
+}
 
 async function fetchSettings() {
 	try {
@@ -290,64 +388,98 @@ async function fetchSettings() {
 			accessForbiddenGroups.value = s.access_forbidden_groups || []
 			accessForbiddenUsersDetails.value = res.data.access_forbidden_users_details || []
 			accessForbiddenGroupsDetails.value = res.data.access_forbidden_groups_details || []
+
+			mergeUsers(createAllowedUsersDetails.value)
+			mergeUsers(accessForbiddenUsersDetails.value)
+			mergeGroups(createAllowedGroupsDetails.value)
+			mergeGroups(accessForbiddenGroupsDetails.value)
 		}
 	} catch (err) {
 		console.error('Failed to load settings:', err)
 	}
 }
 
-async function fetchAllGroups() {
+async function fetchAllUsers() {
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/admin/groups-list')
-		const res = await axios.get<{ groups: GroupOption[] }>(url)
-		if (res.data && Array.isArray(res.data.groups)) {
-			allSystemGroups.value = res.data.groups
+		const url = generateUrl('/apps/customusergroups/api/v1/admin/users-search', { search: '', limit: 500 })
+		const res = await axios.get<{ users: UserOption[] }>(url)
+		if (res.data && Array.isArray(res.data.users)) {
+			mergeUsers(res.data.users)
 		}
 	} catch (err) {
-		console.error('Failed to load system groups:', err)
+		console.error('Failed to preload users:', err)
 	}
 }
 
-// Watch user search for creation
-watch(userSearchCreate, (query) => {
-	if (timerUserCreate) clearTimeout(timerUserCreate)
-	timerUserCreate = setTimeout(async () => {
-		const q = query.trim()
-		if (!q) {
-			usersFoundCreate.value = []
-			return
+async function fetchAllGroups() {
+	try {
+		const url = generateUrl('/apps/customusergroups/api/v1/admin/groups-list', { search: '', limit: 500 })
+		const res = await axios.get<{ groups: GroupOption[] }>(url)
+		if (res.data && Array.isArray(res.data.groups)) {
+			mergeGroups(res.data.groups)
 		}
-		try {
-			const url = generateUrl('/apps/customusergroups/api/v1/admin/users-search', { search: q })
-			const res = await axios.get<{ users: UserOption[] }>(url)
-			usersFoundCreate.value = res.data.users || []
-		} catch (err) {
-			console.error('Failed to search users:', err)
-		}
-	}, 300)
-})
+	} catch (err) {
+		console.error('Failed to preload groups:', err)
+	}
+}
 
-const searchUsersCreateList = computed(() => {
+// Filtered lists for Group Creation restriction
+const filteredAvailableCreateUsers = computed(() => {
 	const selected = new Set(createAllowedUsers.value)
-	return usersFoundCreate.value.filter((u) => !selected.has(u.uid))
+	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
+	const query = userSearchCreate.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(u) =>
+			u.displayName.toLowerCase().includes(query)
+			|| u.uid.toLowerCase().includes(query)
+			|| (u.email && u.email.toLowerCase().includes(query)),
+	)
 })
 
-const searchGroupsCreateList = computed(() => {
-	const q = groupSearchCreate.value.trim().toLowerCase()
-	if (!q) return []
+const filteredAvailableCreateGroups = computed(() => {
 	const selected = new Set(createAllowedGroups.value)
-	return allSystemGroups.value.filter(
-		(g) => !selected.has(g.id) && (g.name.toLowerCase().includes(q) || g.id.toLowerCase().includes(q)),
+	const unselected = allSystemGroups.value.filter((g) => !selected.has(g.id))
+	const query = groupSearchCreate.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(g) =>
+			g.name.toLowerCase().includes(query)
+			|| g.id.toLowerCase().includes(query),
+	)
+})
+
+// Filtered lists for App Access restriction
+const filteredAvailableAccessUsers = computed(() => {
+	const selected = new Set(accessForbiddenUsers.value)
+	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
+	const query = userSearchAccess.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(u) =>
+			u.displayName.toLowerCase().includes(query)
+			|| u.uid.toLowerCase().includes(query)
+			|| (u.email && u.email.toLowerCase().includes(query)),
+	)
+})
+
+const filteredAvailableAccessGroups = computed(() => {
+	const selected = new Set(accessForbiddenGroups.value)
+	const unselected = allSystemGroups.value.filter((g) => !selected.has(g.id))
+	const query = groupSearchAccess.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(g) =>
+			g.name.toLowerCase().includes(query)
+			|| g.id.toLowerCase().includes(query),
 	)
 })
 
 function addCreateUser(user: UserOption) {
 	if (!createAllowedUsers.value.includes(user.uid)) {
 		createAllowedUsers.value.push(user.uid)
-		createAllowedUsersDetails.value.push(user)
+		createAllowedUsersDetails.value.push({ ...user })
 	}
-	userSearchCreate.value = ''
-	usersFoundCreate.value = []
 }
 
 function removeCreateUser(uid: string) {
@@ -358,9 +490,8 @@ function removeCreateUser(uid: string) {
 function addCreateGroup(group: GroupOption) {
 	if (!createAllowedGroups.value.includes(group.id)) {
 		createAllowedGroups.value.push(group.id)
-		createAllowedGroupsDetails.value.push(group)
+		createAllowedGroupsDetails.value.push({ ...group })
 	}
-	groupSearchCreate.value = ''
 }
 
 function removeCreateGroup(gid: string) {
@@ -368,46 +499,11 @@ function removeCreateGroup(gid: string) {
 	createAllowedGroupsDetails.value = createAllowedGroupsDetails.value.filter((g) => g.id !== gid)
 }
 
-// Watch user search for access restriction
-watch(userSearchAccess, (query) => {
-	if (timerUserAccess) clearTimeout(timerUserAccess)
-	timerUserAccess = setTimeout(async () => {
-		const q = query.trim()
-		if (!q) {
-			usersFoundAccess.value = []
-			return
-		}
-		try {
-			const url = generateUrl('/apps/customusergroups/api/v1/admin/users-search', { search: q })
-			const res = await axios.get<{ users: UserOption[] }>(url)
-			usersFoundAccess.value = res.data.users || []
-		} catch (err) {
-			console.error('Failed to search users:', err)
-		}
-	}, 300)
-})
-
-const searchUsersAccessList = computed(() => {
-	const selected = new Set(accessForbiddenUsers.value)
-	return usersFoundAccess.value.filter((u) => !selected.has(u.uid))
-})
-
-const searchGroupsAccessList = computed(() => {
-	const q = groupSearchAccess.value.trim().toLowerCase()
-	if (!q) return []
-	const selected = new Set(accessForbiddenGroups.value)
-	return allSystemGroups.value.filter(
-		(g) => !selected.has(g.id) && (g.name.toLowerCase().includes(q) || g.id.toLowerCase().includes(q)),
-	)
-})
-
 function addAccessUser(user: UserOption) {
 	if (!accessForbiddenUsers.value.includes(user.uid)) {
 		accessForbiddenUsers.value.push(user.uid)
-		accessForbiddenUsersDetails.value.push(user)
+		accessForbiddenUsersDetails.value.push({ ...user })
 	}
-	userSearchAccess.value = ''
-	usersFoundAccess.value = []
 }
 
 function removeAccessUser(uid: string) {
@@ -418,9 +514,8 @@ function removeAccessUser(uid: string) {
 function addAccessGroup(group: GroupOption) {
 	if (!accessForbiddenGroups.value.includes(group.id)) {
 		accessForbiddenGroups.value.push(group.id)
-		accessForbiddenGroupsDetails.value.push(group)
+		accessForbiddenGroupsDetails.value.push({ ...group })
 	}
-	groupSearchAccess.value = ''
 }
 
 function removeAccessGroup(gid: string) {
@@ -472,7 +567,7 @@ async function save() {
 .restriction-details {
 	display: flex;
 	flex-direction: column;
-	gap: 16px;
+	gap: 20px;
 	padding: 16px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
@@ -496,56 +591,66 @@ async function save() {
 }
 
 .picker-label {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--color-main-text);
 }
 
-.search-picker-input {
-	position: relative;
+.search-input-wrapper {
+	margin-top: 4px;
 }
 
-.search-dropdown-list {
-	max-height: 180px;
-	overflow-y: auto;
-	background: var(--color-main-background);
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-element);
+.selected-items-list,
+.available-items-list {
 	display: flex;
 	flex-direction: column;
-	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+	max-height: 180px;
+	overflow-y: auto;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	background-color: var(--color-main-background);
 }
 
-.dropdown-item {
+.selected-item,
+.available-item {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
 	padding: 8px 12px;
+	border-bottom: 1px solid var(--color-border);
 	cursor: pointer;
 	transition: background-color 0.15s ease;
-	border-bottom: 1px solid var(--color-border);
 }
 
-.dropdown-item:last-child {
+.selected-item:last-child,
+.available-item:last-child {
 	border-bottom: none;
 }
 
-.dropdown-item:hover {
+.selected-item:hover,
+.available-item:hover {
 	background-color: var(--color-background-hover);
 }
 
-.user-display,
-.group-display {
+.item-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.item-primary {
 	font-size: 13px;
 	font-weight: 600;
 	color: var(--color-main-text);
 }
 
-.user-sub {
+.item-secondary {
 	font-size: 11px;
 	color: var(--color-text-maxcontrast);
-	margin-left: 6px;
-	margin-right: auto;
+}
+
+.item-forbidden .item-primary {
+	color: var(--color-error, #e9322d);
 }
 
 .cug-badge {
@@ -554,60 +659,16 @@ async function save() {
 	color: var(--color-primary-element-light-text);
 	padding: 2px 6px;
 	border-radius: 8px;
-	margin-left: 8px;
-	margin-right: auto;
-}
-
-.cug-badge-small {
-	font-size: 9px;
-	background-color: var(--color-primary-element-light);
-	color: var(--color-primary-element-light-text);
-	padding: 1px 4px;
-	border-radius: 6px;
-}
-
-.selected-chips-grid {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin-top: 4px;
-}
-
-.chip {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-	padding: 4px 10px;
-	border-radius: 16px;
-	font-size: 12px;
-	background-color: var(--color-main-background);
-	border: 1px solid var(--color-border);
-	color: var(--color-main-text);
-}
-
-.chip-forbidden {
-	border-color: var(--color-error);
-	color: var(--color-error);
-}
-
-.chip-remove {
-	background: none;
-	border: none;
-	cursor: pointer;
-	padding: 0 2px;
-	font-size: 11px;
-	color: var(--color-text-maxcontrast);
-	line-height: 1;
-}
-
-.chip-remove:hover {
-	color: var(--color-error);
+	margin-top: 2px;
+	display: inline-block;
+	width: fit-content;
 }
 
 .empty-hint {
 	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 	font-style: italic;
+	padding: 4px 0;
 }
 
 .actions-bar {

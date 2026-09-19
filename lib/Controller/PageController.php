@@ -60,6 +60,8 @@ class PageController extends Controller {
 		$groups = [];
 		foreach ($rawGroups as $g) {
 			$creatorUser = $this->userManager->get($g['creator_id']);
+			$ownerId = $g['owner_id'] ?? $g['creator_id'];
+			$ownerUser = $this->userManager->get($ownerId);
 			$members = [];
 			foreach ($g['member_ids'] as $uid) {
 				$user = $this->userManager->get($uid);
@@ -69,17 +71,23 @@ class PageController extends Controller {
 				];
 			}
 
+			$isOwner = ($ownerId === $this->userId);
+			$isCreator = ($g['creator_id'] === $this->userId);
+
 			$groups[] = [
 				'group_id' => $g['group_id'],
 				'name' => $g['name'],
 				'creator_id' => $g['creator_id'],
 				'creator_displayName' => $creatorUser ? $creatorUser->getDisplayName() : $g['creator_id'],
+				'owner_id' => $ownerId,
+				'owner_displayName' => $ownerUser ? $ownerUser->getDisplayName() : $ownerId,
 				'created_at' => $g['created_at'],
 				'member_ids' => $g['member_ids'],
 				'members' => $members,
 				'member_count' => count($members),
-				'can_edit' => ($g['creator_id'] === $this->userId) || $isAdmin,
-				'is_creator' => ($g['creator_id'] === $this->userId),
+				'can_edit' => $isOwner || $isAdmin,
+				'is_owner' => $isOwner,
+				'is_creator' => $isCreator,
 			];
 		}
 

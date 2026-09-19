@@ -14,8 +14,35 @@ use OCP\IDBConnection;
  */
 class CustomGroupMapper extends QBMapper {
 
+	private static bool $schemaChecked = false;
+
 	public function __construct(IDBConnection $db) {
 		parent::__construct($db, 'custom_user_groups', CustomGroupMember::class);
+		$this->ensureSchema();
+	}
+
+	private function ensureSchema(): void {
+		if (self::$schemaChecked) {
+			return;
+		}
+		self::$schemaChecked = true;
+
+		try {
+			$qb = $this->db->getQueryBuilder();
+			$qb->select('*')
+				->from($this->getTableName())
+				->setMaxResults(1);
+			$res = $qb->executeQuery();
+			$row = $res->fetchAssociative();
+			$res->closeCursor();
+
+			if ($row !== false && !array_key_exists('owner_id', $row)) {
+				$this->db->executeStatement("ALTER TABLE {$this->getTableName()} ADD COLUMN owner_id VARCHAR(64) NULL DEFAULT NULL");
+				$this->db->executeStatement("UPDATE {$this->getTableName()} SET owner_id = creator_id WHERE owner_id IS NULL OR owner_id = ''");
+			}
+		} catch (\Throwable $e) {
+			// Suppress error if table does not exist yet or no permission
+		}
 	}
 
 	public function groupExists(string $groupId): bool {
@@ -170,7 +197,7 @@ class CustomGroupMapper extends QBMapper {
 	/**
 	 * Returns metadata and list of member IDs for a group
 	 *
-	 * @return array{group_id: string, name: string, creator_id: string, created_at: string, member_ids: string[]}|null
+	 * @return array{group_id: string, name: string, creator_id: string, owner_id: string, created_at: string, member_ids: string[]}|null
 	 */
 	public function getGroupDetails(string $groupId): ?array {
 		$qb = $this->db->getQueryBuilder();
@@ -188,6 +215,8 @@ class CustomGroupMapper extends QBMapper {
 		}
 
 		$first = $rows[0];
+		$creatorId = (string)$first['creator_id'];
+		$ownerId = (!empty($first['owner_id'])) ? (string)$first['owner_id'] : $creatorId;
 		$members = [];
 		foreach ($rows as $row) {
 			if (!empty($row['member_id'])) {
@@ -198,7 +227,8 @@ class CustomGroupMapper extends QBMapper {
 		return [
 			'group_id' => (string)$first['group_id'],
 			'name' => (string)$first['name'],
-			'creator_id' => (string)$first['creator_id'],
+			'creator_id' => $creatorId,
+			'owner_id' => $ownerId,
 			'created_at' => (string)$first['created_at'],
 			'member_ids' => array_values(array_unique($members)),
 		];
@@ -207,7 +237,7 @@ class CustomGroupMapper extends QBMapper {
 	/**
 	 * Returns list of groups with members
 	 *
-	 * @return array<int, array{group_id: string, name: string, creator_id: string, created_at: string, member_ids: string[]}>
+	 * @return array<int, array{group_id: string, name: string, creator_id: string, owner_id: string, created_at: string, member_ids: string[]}>
 	 */
 	public function getAllGroups(?string $forUserId = null, bool $isAdmin = false, string $search = ''): array {
 		$qb = $this->db->getQueryBuilder();
@@ -217,13 +247,14 @@ class CustomGroupMapper extends QBMapper {
 			->addOrderBy('id', 'ASC');
 
 		if (!$isAdmin && $forUserId !== null) {
-			// Find group_ids where user is creator or member
+			// Find group_ids where user is creator, owner or member
 			$subQb = $this->db->getQueryBuilder();
 			$subQb->selectDistinct('group_id')
 				->from($this->getTableName())
 				->where(
 					$subQb->expr()->orX(
 						$subQb->expr()->eq('creator_id', $subQb->createNamedParameter($forUserId)),
+						$subQb->expr()->eq('owner_id', $subQb->createNamedParameter($forUserId)),
 						$subQb->expr()->eq('member_id', $subQb->createNamedParameter($forUserId))
 					)
 				);
@@ -256,10 +287,13 @@ class CustomGroupMapper extends QBMapper {
 		foreach ($rows as $row) {
 			$gid = (string)$row['group_id'];
 			if (!isset($groups[$gid])) {
+				$creatorId = (string)$row['creator_id'];
+				$ownerId = (!empty($row['owner_id'])) ? (string)$row['owner_id'] : $creatorId;
 				$groups[$gid] = [
 					'group_id' => $gid,
 					'name' => (string)$row['name'],
-					'creator_id' => (string)$row['creator_id'],
+					'creator_id' => $creatorId,
+					'owner_id' => $ownerId,
 					'created_at' => (string)$row['created_at'],
 					'member_ids' => [],
 				];
@@ -282,14 +316,16 @@ class CustomGroupMapper extends QBMapper {
 	 *
 	 * @param string[] $memberIds
 	 */
-	public function createGroup(string $groupId, string $name, string $creatorId, array $memberIds, DateTime $createdAt): void {
+	public function createGroup(string $groupId, string $name, string $creatorId, array $memberIds, DateTime $createdAt, ?string $ownerId = null): void {
 		$memberIds = array_values(array_unique(array_filter($memberIds)));
+		$ownerId = ($ownerId !== null && trim($ownerId) !== '') ? trim($ownerId) : $creatorId;
 
 		if (empty($memberIds)) {
 			$entity = new CustomGroupMember();
 			$entity->setGroupId($groupId);
 			$entity->setName($name);
 			$entity->setCreatorId($creatorId);
+			$entity->setOwnerId($ownerId);
 			$entity->setMemberId(null);
 			$entity->setCreatedAt($createdAt);
 			$this->insert($entity);
@@ -301,6 +337,7 @@ class CustomGroupMapper extends QBMapper {
 			$entity->setGroupId($groupId);
 			$entity->setName($name);
 			$entity->setCreatorId($creatorId);
+			$entity->setOwnerId($ownerId);
 			$entity->setMemberId($memberId);
 			$entity->setCreatedAt($createdAt);
 			$this->insert($entity);
@@ -308,17 +345,18 @@ class CustomGroupMapper extends QBMapper {
 	}
 
 	/**
-	 * Update group name and members list
+	 * Update group name, members list, and optionally transfer owner
 	 *
 	 * @param string[] $newMemberIds
 	 */
-	public function updateGroup(string $groupId, string $newName, array $newMemberIds): void {
+	public function updateGroup(string $groupId, string $newName, array $newMemberIds, ?string $newOwnerId = null): void {
 		$existingDetails = $this->getGroupDetails($groupId);
 		if ($existingDetails === null) {
 			return;
 		}
 
 		$creatorId = $existingDetails['creator_id'];
+		$ownerId = ($newOwnerId !== null && trim($newOwnerId) !== '') ? trim($newOwnerId) : $existingDetails['owner_id'];
 		$createdAt = new DateTime($existingDetails['created_at']);
 		$newMemberIds = array_values(array_unique(array_filter($newMemberIds)));
 
@@ -328,14 +366,30 @@ class CustomGroupMapper extends QBMapper {
 			$this->cleanupUserDelegation($groupId, (string)$removedUid);
 		}
 
+		// If owner was transferred, remove delegation entry for the new owner
+		if ($ownerId !== $existingDetails['owner_id']) {
+			$this->cleanupUserDelegation($groupId, $ownerId);
+		}
+
 		// Delete existing membership rows for this group
 		$qb = $this->db->getQueryBuilder();
 		$qb->delete($this->getTableName())
 			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
 		$qb->executeStatement();
 
-		// Insert updated rows
-		$this->createGroup($groupId, $newName, $creatorId, $newMemberIds, $createdAt);
+		// Insert updated rows with preserved creatorId and updated/preserved ownerId
+		$this->createGroup($groupId, $newName, $creatorId, $newMemberIds, $createdAt, $ownerId);
+	}
+
+	public function transferOwnership(string $groupId, string $newOwnerId): void {
+		$newOwnerId = trim($newOwnerId);
+		$qb = $this->db->getQueryBuilder();
+		$qb->update($this->getTableName())
+			->set('owner_id', $qb->createNamedParameter($newOwnerId))
+			->where($qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)));
+		$qb->executeStatement();
+
+		$this->cleanupUserDelegation($groupId, $newOwnerId);
 	}
 
 	public function deleteGroup(string $groupId): void {
@@ -384,6 +438,7 @@ class CustomGroupMapper extends QBMapper {
 		$entity->setGroupId($groupId);
 		$entity->setName($details['name']);
 		$entity->setCreatorId($details['creator_id']);
+		$entity->setOwnerId($details['owner_id']);
 		$entity->setMemberId($userId);
 		$entity->setCreatedAt(new DateTime($details['created_at']));
 		$this->insert($entity);
@@ -416,6 +471,7 @@ class CustomGroupMapper extends QBMapper {
 			$entity->setGroupId($groupId);
 			$entity->setName($details['name']);
 			$entity->setCreatorId($details['creator_id']);
+			$entity->setOwnerId($details['owner_id']);
 			$entity->setMemberId(null);
 			$entity->setCreatedAt(new DateTime($details['created_at']));
 			$this->insert($entity);
@@ -446,6 +502,11 @@ class CustomGroupMapper extends QBMapper {
 		$qb2->delete('custom_user_group_requests')
 			->where($qb2->expr()->eq('group_id', $qb2->createNamedParameter($groupId)));
 		$qb2->executeStatement();
+
+		$qb3 = $this->db->getQueryBuilder();
+		$qb3->delete('custom_user_group_activity')
+			->where($qb3->expr()->eq('group_id', $qb3->createNamedParameter($groupId)));
+		$qb3->executeStatement();
 	}
 
 	public function setGroupName(string $groupId, string $name): bool {

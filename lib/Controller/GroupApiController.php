@@ -6,6 +6,8 @@ namespace OCA\CustomUserGroups\Controller;
 
 use DateTime;
 use Exception;
+use OCA\CustomUserGroups\Db\CustomGroupActivity;
+use OCA\CustomUserGroups\Db\CustomGroupActivityMapper;
 use OCA\CustomUserGroups\Db\CustomGroupDelegation;
 use OCA\CustomUserGroups\Db\CustomGroupDelegationMapper;
 use OCA\CustomUserGroups\Db\CustomGroupMapper;
@@ -37,6 +39,7 @@ class GroupApiController extends Controller {
 		private CustomGroupMapper $mapper,
 		private CustomGroupDelegationMapper $delegationMapper,
 		private CustomGroupRequestMapper $requestMapper,
+		private CustomGroupActivityMapper $activityMapper,
 		private AuditService $auditService,
 		private SettingsService $settingsService,
 		private IUserManager $userManager,
@@ -163,7 +166,7 @@ class GroupApiController extends Controller {
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'PUT', url: '/api/v1/groups/{groupId}')]
-	public function updateGroup(string $groupId, string $name, array $memberIds = []): JSONResponse {
+	public function updateGroup(string $groupId, string $name, array $memberIds = [], ?string $newOwnerId = null): JSONResponse {
 		if ($err = $this->checkAccess()) {
 			return $err;
 		}
@@ -180,6 +183,8 @@ class GroupApiController extends Controller {
 
 		$currentUid = (string)$this->userId;
 		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$currentOwnerId = $existing['owner_id'] ?? $existing['creator_id'];
+		$isOwner = ($currentOwnerId === $currentUid);
 		$canManage = $this->canManageGroup($existing, $currentUid);
 		$canModerate = $this->canModerateGroup($existing, $currentUid);
 
@@ -207,26 +212,73 @@ class GroupApiController extends Controller {
 			}
 		}
 
+		// Ownership transfer validation
+		$newOwnerId = ($newOwnerId !== null) ? trim($newOwnerId) : null;
+		$transferOwnership = ($newOwnerId !== null && $newOwnerId !== '' && $newOwnerId !== $currentOwnerId);
+		if ($transferOwnership) {
+			if (!$isOwner && !$isAdmin) {
+				return new JSONResponse(
+					['error' => 'Передача владения доступна только текущему владельцу группы или администратору'],
+					Http::STATUS_FORBIDDEN
+				);
+			}
+
+			if (!$this->userManager->userExists($newOwnerId)) {
+				return new JSONResponse(
+					['error' => 'Указанный новый владелец не найден в системе'],
+					Http::STATUS_BAD_REQUEST
+				);
+			}
+
+			if (!in_array($newOwnerId, $validMemberIds, true)) {
+				return new JSONResponse(
+					['error' => 'Новый владелец должен быть участником группы'],
+					Http::STATUS_BAD_REQUEST
+				);
+			}
+		}
+
 		try {
 			$oldMembers = $existing['member_ids'];
 			$toAdd = array_values(array_diff($validMemberIds, $oldMembers));
 			$toRemove = array_values(array_diff($oldMembers, $validMemberIds));
 
-			$this->mapper->updateGroup($groupId, $name, $validMemberIds);
+			$finalOwnerId = $transferOwnership ? $newOwnerId : null;
+			$this->mapper->updateGroup($groupId, $name, $validMemberIds, $finalOwnerId);
 			$updated = $this->mapper->getGroupDetails($groupId);
 			if ($updated === null) {
 				return new JSONResponse(['error' => 'Не удалось обновить группу'], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
-			// Audit logs
+			// Audit logs (system audit + group activity)
 			if ($nameChanged) {
 				$this->auditService->auditGroupRenamed($groupId, $existing['name'], $name, $currentUid);
+				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_NAME_CHANGE, $currentUid, null, [
+					'old_name' => $existing['name'],
+					'new_name' => $name,
+				]);
+			}
+			if ($transferOwnership) {
+				$this->delegationMapper->removeDelegation($groupId, $newOwnerId);
+				$this->auditService->auditOwnershipTransferred(
+					$groupId,
+					$name,
+					$currentOwnerId,
+					$newOwnerId,
+					$currentUid
+				);
+				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_OWNER_TRANSFER, $currentUid, $newOwnerId, [
+					'previous_owner' => $currentOwnerId,
+					'new_owner' => $newOwnerId,
+				]);
 			}
 			foreach ($toRemove as $uid) {
 				$this->auditService->auditMemberRemoved($groupId, $name, $uid, $currentUid);
+				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_REMOVE, $currentUid, $uid);
 			}
 			foreach ($toAdd as $uid) {
 				$this->auditService->auditMemberAdded($groupId, $name, $uid, $currentUid);
+				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $uid);
 			}
 
 			// Dispatch Nextcloud core group events
@@ -250,6 +302,68 @@ class GroupApiController extends Controller {
 			}
 
 			return new JSONResponse($this->enrichGroup($updated, $isAdmin));
+		} catch (Exception $e) {
+			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+	}
+
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'POST', url: '/api/v1/groups/{groupId}/transfer-ownership')]
+	public function transferOwnership(string $groupId, string $newOwnerId): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$existing = $this->mapper->getGroupDetails($groupId);
+		if ($existing === null) {
+			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+		}
+
+		$currentUid = (string)$this->userId;
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$currentOwnerId = $existing['owner_id'] ?? $existing['creator_id'];
+		$isOwner = ($currentOwnerId === $currentUid);
+
+		if (!$isOwner && !$isAdmin) {
+			return new JSONResponse(
+				['error' => 'Передача владения доступна только текущему владельцу группы или администратору'],
+				Http::STATUS_FORBIDDEN
+			);
+		}
+
+		$newOwnerId = trim($newOwnerId);
+		if ($newOwnerId === '' || !$this->userManager->userExists($newOwnerId)) {
+			return new JSONResponse(['error' => 'Указанный новый владелец не найден в системе'], Http::STATUS_BAD_REQUEST);
+		}
+
+		if (!$this->mapper->isMember($groupId, $newOwnerId)) {
+			return new JSONResponse(['error' => 'Новый владелец должен быть действующим участником группы'], Http::STATUS_BAD_REQUEST);
+		}
+
+		if ($newOwnerId === $currentOwnerId) {
+			return new JSONResponse(['error' => 'Пользователь уже является владельцем этой группы'], Http::STATUS_BAD_REQUEST);
+		}
+
+		try {
+			$this->mapper->transferOwnership($groupId, $newOwnerId);
+			$this->delegationMapper->removeDelegation($groupId, $newOwnerId);
+			$this->auditService->auditOwnershipTransferred(
+				$groupId,
+				$existing['name'],
+				$currentOwnerId,
+				$newOwnerId,
+				$currentUid
+			);
+			$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_OWNER_TRANSFER, $currentUid, $newOwnerId, [
+				'previous_owner' => $currentOwnerId,
+				'new_owner' => $newOwnerId,
+			]);
+
+			$updated = $this->mapper->getGroupDetails($groupId);
+			return new JSONResponse([
+				'success' => true,
+				'group' => $updated ? $this->enrichGroup($updated, $isAdmin) : null,
+			]);
 		} catch (Exception $e) {
 			return new JSONResponse(['error' => $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
@@ -365,9 +479,10 @@ class GroupApiController extends Controller {
 		}
 
 		// Owner cannot be assigned a delegation
-		if ($userId === $group['creator_id']) {
+		$currentOwnerId = $group['owner_id'] ?? $group['creator_id'];
+		if ($userId === $currentOwnerId) {
 			return new JSONResponse(
-				['error' => 'Создатель группы уже обладает всеми правами управления'],
+				['error' => 'Владелец группы уже обладает всеми правами управления'],
 				Http::STATUS_BAD_REQUEST
 			);
 		}
@@ -390,6 +505,10 @@ class GroupApiController extends Controller {
 		} elseif ($oldLevel !== $level) {
 			$this->auditService->auditDelegationChanged($groupId, $group['name'], $userId, $oldLevel, $level, $currentUid);
 		}
+		$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_DELEGATION_ASSIGN, $currentUid, $userId, [
+			'level' => $level,
+			'old_level' => $oldLevel,
+		]);
 
 		$user = $this->userManager->get($userId);
 		return new JSONResponse([
@@ -427,6 +546,9 @@ class GroupApiController extends Controller {
 		if ($existing !== null) {
 			$this->delegationMapper->revokeDelegation($groupId, $userId);
 			$this->auditService->auditDelegationRevoked($groupId, $group['name'], $userId, $existing->getLevel(), $currentUid);
+			$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_DELEGATION_REVOKE, $currentUid, $userId, [
+				'level' => $existing->getLevel(),
+			]);
 		}
 
 		return new JSONResponse(['success' => true]);
@@ -506,6 +628,7 @@ class GroupApiController extends Controller {
 				}
 			}
 			$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
+			$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $candidateId);
 			return new JSONResponse(['success' => true, 'added_directly' => true], Http::STATUS_CREATED);
 		}
 
@@ -565,6 +688,7 @@ class GroupApiController extends Controller {
 		// Audit logging
 		$this->auditService->auditRequestApproved($groupId, $group['name'], $candidateId, $currentUid);
 		$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
+		$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $candidateId, ['via_request' => true]);
 
 		return new JSONResponse([
 			'success' => true,
@@ -674,12 +798,12 @@ class GroupApiController extends Controller {
 	}
 
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/groups-list')]
-	public function getAdminGroupsList(string $search = ''): JSONResponse {
+	public function getAdminGroupsList(string $search = '', int $limit = 500): JSONResponse {
 		if ($err = $this->checkAdmin()) {
 			return $err;
 		}
 
-		$groups = $this->groupManager->search($search, 100);
+		$groups = $this->groupManager->search($search, $limit);
 		$result = [];
 		foreach ($groups as $group) {
 			$result[] = [
@@ -693,16 +817,12 @@ class GroupApiController extends Controller {
 	}
 
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/users-search')]
-	public function searchAdminUsers(string $search = '', int $limit = 50): JSONResponse {
+	public function searchAdminUsers(string $search = '', int $limit = 500): JSONResponse {
 		if ($err = $this->checkAdmin()) {
 			return $err;
 		}
 
 		$search = trim($search);
-		if ($search === '') {
-			return new JSONResponse(['users' => []]);
-		}
-
 		$users = $this->userManager->search($search, $limit);
 		$result = [];
 		foreach ($users as $user) {
@@ -719,12 +839,42 @@ class GroupApiController extends Controller {
 		return new JSONResponse(['users' => $result]);
 	}
 
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups/{groupId}/activities')]
+	public function getActivities(string $groupId): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$group = $this->mapper->getGroupDetails($groupId);
+		if ($group === null) {
+			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+		}
+
+		$currentUid = (string)$this->userId;
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		$isOwner = ($ownerId === $currentUid);
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$delegationLevel = $this->getDelegationLevel($groupId, $currentUid);
+
+		if (!$isOwner && !$isAdmin && $delegationLevel !== CustomGroupDelegation::LEVEL_MANAGE) {
+			return new JSONResponse(
+				['error' => 'Просмотр истории действий доступен только владельцу группы, управляющему или администратору'],
+				Http::STATUS_FORBIDDEN
+			);
+		}
+
+		$activities = $this->activityMapper->getActivities($groupId, 200);
+		return new JSONResponse(['activities' => $activities]);
+	}
+
 	// ==========================================
 	// PERMISSION HELPERS & DATA ENRICHMENT
 	// ==========================================
 
 	private function canManageGroup(array $group, string $userId): bool {
-		if ($group['creator_id'] === $userId || $this->groupManager->isAdmin($userId)) {
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		if ($ownerId === $userId || $this->groupManager->isAdmin($userId)) {
 			return true;
 		}
 
@@ -742,12 +892,14 @@ class GroupApiController extends Controller {
 	}
 
 	private function canManageDelegations(array $group, string $userId): bool {
-		return ($group['creator_id'] === $userId) || $this->groupManager->isAdmin($userId);
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		return ($ownerId === $userId) || $this->groupManager->isAdmin($userId);
 	}
 
 	private function canRequestMember(array $group, string $userId): bool {
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
 		return $this->mapper->isMember($group['group_id'], $userId)
-			|| ($group['creator_id'] === $userId)
+			|| ($ownerId === $userId)
 			|| $this->groupManager->isAdmin($userId);
 	}
 
@@ -816,13 +968,19 @@ class GroupApiController extends Controller {
 	 * Enrich group record with creator display name and email, detailed members with email,
 	 * permissions, delegations, and pending request count
 	 *
-	 * @param array{group_id: string, name: string, creator_id: string, created_at: string, member_ids: string[]} $group
+	 * @param array{group_id: string, name: string, creator_id: string, owner_id?: string, created_at: string, member_ids: string[]} $group
 	 * @return array<string, mixed>
 	 */
 	private function enrichGroup(array $group, bool $isAdmin): array {
-		$creatorUser = $this->userManager->get($group['creator_id']);
-		$creatorDisplayName = $creatorUser ? $creatorUser->getDisplayName() : $group['creator_id'];
+		$creatorId = $group['creator_id'];
+		$creatorUser = $this->userManager->get($creatorId);
+		$creatorDisplayName = $creatorUser ? $creatorUser->getDisplayName() : $creatorId;
 		$creatorEmail = ($creatorUser && $creatorUser->getEMailAddress()) ? $creatorUser->getEMailAddress() : '';
+
+		$ownerId = $group['owner_id'] ?? $creatorId;
+		$ownerUser = $this->userManager->get($ownerId);
+		$ownerDisplayName = $ownerUser ? $ownerUser->getDisplayName() : $ownerId;
+		$ownerEmail = ($ownerUser && $ownerUser->getEMailAddress()) ? $ownerUser->getEMailAddress() : '';
 
 		$members = [];
 		foreach ($group['member_ids'] as $uid) {
@@ -846,7 +1004,8 @@ class GroupApiController extends Controller {
 		}
 
 		$currentUserId = $this->userId ?? '';
-		$isOwner = ($group['creator_id'] === $currentUserId);
+		$isOwner = ($ownerId === $currentUserId);
+		$isCreator = ($creatorId === $currentUserId);
 		$userDelegationLevel = $this->getDelegationLevel($group['group_id'], $currentUserId);
 
 		$canManage = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
@@ -854,14 +1013,18 @@ class GroupApiController extends Controller {
 		$canDelegate = $isOwner || $isAdmin;
 		$isMember = $this->mapper->isMember($group['group_id'], $currentUserId);
 		$canRequest = $isMember || $isOwner || $isAdmin;
+		$canViewHistory = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
 		$pendingCount = $this->requestMapper->countPendingRequests($group['group_id']);
 
 		return [
 			'group_id' => $group['group_id'],
 			'name' => $group['name'],
-			'creator_id' => $group['creator_id'],
+			'creator_id' => $creatorId,
 			'creator_displayName' => $creatorDisplayName,
 			'creator_email' => $creatorEmail,
+			'owner_id' => $ownerId,
+			'owner_displayName' => $ownerDisplayName,
+			'owner_email' => $ownerEmail,
 			'created_at' => $group['created_at'],
 			'member_ids' => $group['member_ids'],
 			'members' => $members,
@@ -871,7 +1034,8 @@ class GroupApiController extends Controller {
 			'delegates_moderate' => $delegatesModerate,
 			'pending_requests_count' => $pendingCount,
 			'can_edit' => $canModerate,
-			'is_creator' => $isOwner,
+			'is_owner' => $isOwner,
+			'is_creator' => $isCreator,
 			'permissions' => [
 				'can_edit_name' => $canManage,
 				'can_edit_members' => $canModerate,
@@ -879,6 +1043,8 @@ class GroupApiController extends Controller {
 				'can_delegate' => $canDelegate,
 				'can_moderate_requests' => $canModerate,
 				'can_request_member' => $canRequest,
+				'can_transfer_ownership' => ($isOwner || $isAdmin),
+				'can_view_history' => $canViewHistory,
 				'delegation_level' => $userDelegationLevel,
 			],
 		];

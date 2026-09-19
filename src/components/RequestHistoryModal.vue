@@ -63,7 +63,7 @@
 							<span class="candidate-email">{{ req.candidate_email || ('@' + req.candidate_id) }}</span>
 						</div>
 						<div class="status-tag" :class="'tag-' + req.status">
-							{{ req.status === 'approved' ? '✓ Одобрен' : '✕ Отклонен' }}
+							{{ req.status === 'approved' ? 'Одобрен' : 'Отклонен' }}
 						</div>
 					</div>
 
@@ -327,12 +327,12 @@ function formatDate(dateStr?: string | null): string {
 
 .tag-approved {
 	background-color: rgba(70, 186, 97, 0.15);
-	color: var(--color-success);
+	color: inherit;
 }
 
 .tag-rejected {
 	background-color: rgba(224, 76, 56, 0.15);
-	color: var(--color-error);
+	color: inherit;
 }
 
 .card-details {

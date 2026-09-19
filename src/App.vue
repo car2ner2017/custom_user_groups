@@ -86,19 +86,32 @@
 							</h1>
 							<div class="group-meta">
 								<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
-								<span class="meta-tag creator-tag">
+								<span v-if="isAdmin || selectedGroup.is_owner" class="meta-tag creator-tag">
 									Создатель: {{ selectedGroup.creator_displayName }}
 									<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
 								</span>
+								<span class="meta-tag owner-tag">
+									Владелец: {{ selectedGroup.owner_displayName || selectedGroup.creator_displayName }}
+									<template v-if="selectedGroup.owner_email || (!selectedGroup.owner_id && selectedGroup.creator_email)">
+										({{ selectedGroup.owner_email || selectedGroup.creator_email }})
+									</template>
+								</span>
 								<span class="meta-tag date-tag">Создана: {{ formatDate(selectedGroup.created_at) }}</span>
-								<span v-if="selectedGroup.is_creator" class="role-badge creator-badge">Вы создатель</span>
-								<span v-else-if="isAdmin" class="role-badge admin-badge">Вы Администратор</span>
-								<span v-else-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">Вы управляющий</span>
-								<span v-else-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
+								<span v-if="isAdmin" class="role-badge admin-badge">Вы Администратор</span>
+								<span v-if="selectedGroup.is_owner" class="role-badge owner-badge">Вы владелец</span>
+								<span v-if="selectedGroup.is_creator && !selectedGroup.is_owner" class="role-badge creator-badge">Вы создатель</span>
+								<span v-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">Вы управляющий</span>
+								<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
 							</div>
 						</div>
 
 						<div class="group-header-actions">
+							<NcButton
+								v-if="selectedGroup.permissions?.can_view_history"
+								type="tertiary"
+								@click="showActivityModal = true">
+								История действий
+							</NcButton>
 							<NcButton
 								v-if="selectedGroup.permissions?.can_delegate"
 								type="tertiary"
@@ -209,10 +222,10 @@
 										</NcButton>
 									</template>
 									<span v-else-if="req.status === 'approved'" class="status-badge status-approved">
-										✓ Одобрен
+										Одобрен
 									</span>
 									<span v-else-if="req.status === 'rejected'" class="status-badge status-rejected">
-										✕ Отклонен
+										Отклонен
 									</span>
 								</div>
 							</div>
@@ -279,7 +292,12 @@
 							<!-- Badges on card -->
 							<div class="member-card-badges">
 								<span
-									v-if="member.uid === selectedGroup.creator_id"
+									v-if="member.uid === (selectedGroup.owner_id || selectedGroup.creator_id)"
+									class="member-badge owner-tag">
+									Владелец
+								</span>
+								<span
+									v-if="member.uid === selectedGroup.creator_id && selectedGroup.creator_id !== (selectedGroup.owner_id || selectedGroup.creator_id) && (isAdmin || selectedGroup.is_owner)"
 									class="member-badge creator-tag">
 									Создатель
 								</span>
@@ -320,6 +338,7 @@
 		<GroupModal
 			:show="showGroupModal"
 			:group="modalGroup"
+			:is-admin="isAdmin"
 			@close="showGroupModal = false"
 			@saved="onGroupSaved" />
 
@@ -354,6 +373,13 @@
 			:group="selectedGroup"
 			@close="showHistoryModal = false" />
 
+		<!-- Group Activity Modal -->
+		<GroupActivityModal
+			v-if="selectedGroup"
+			:show="showActivityModal"
+			:group="selectedGroup"
+			@close="showActivityModal = false" />
+
 		<!-- Delete Confirm Modal -->
 		<ConfirmModal
 			:show="showDeleteModal"
@@ -384,6 +410,7 @@ import AddMemberModal from './components/AddMemberModal.vue'
 import DelegationModal from './components/DelegationModal.vue'
 import RequestMemberModal from './components/RequestMemberModal.vue'
 import RequestHistoryModal from './components/RequestHistoryModal.vue'
+import GroupActivityModal from './components/GroupActivityModal.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import type { AppState, CustomGroup, MembershipRequest } from './types'
 
@@ -415,6 +442,7 @@ const showAddMemberModal = ref(false)
 const showDelegationModal = ref(false)
 const showRequestModal = ref(false)
 const showHistoryModal = ref(false)
+const showActivityModal = ref(false)
 const showDeleteModal = ref(false)
 const groupToDelete = ref<CustomGroup | null>(null)
 const deleting = ref(false)
@@ -434,7 +462,7 @@ onMounted(async () => {
 // Filter groups
 const myGroups = computed(() => {
 	if (!currentUserId.value) return []
-	return allGroups.value.filter((g) => g.creator_id === currentUserId.value)
+	return allGroups.value.filter((g) => (g.owner_id ? g.owner_id === currentUserId.value : g.creator_id === currentUserId.value) || g.creator_id === currentUserId.value)
 })
 
 const memberGroups = computed(() => {
@@ -702,6 +730,13 @@ async function reloadGroups() {
 			isAdmin.value = res.data.isAdmin
 			canCreateGroups.value = res.data.canCreateGroups ?? true
 			currentUserId.value = res.data.currentUserId
+
+			if (selectedGroupId.value) {
+				const stillExists = allGroups.value.some((g) => g.group_id === selectedGroupId.value)
+				if (!stillExists) {
+					selectedGroupId.value = allGroups.value.length > 0 ? allGroups.value[0].group_id : null
+				}
+			}
 		}
 	} catch (err) {
 		console.error('Failed to reload groups:', err)
@@ -802,9 +837,14 @@ async function reloadGroups() {
 	border-radius: 10px;
 }
 
-.creator-badge {
+.owner-badge {
 	background-color: var(--color-success-element);
 	color: var(--color-success-element-text);
+}
+
+.creator-badge {
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
 }
 
 .admin-badge {
@@ -856,19 +896,19 @@ async function reloadGroups() {
 	font-size: 11px;
 	font-weight: 500;
 	padding: 2px 8px;
-	border-radius: 12px;
+	border-radius: 5px;
 }
 
 .manage-chip {
 	background-color: var(--color-warning-element-light, #fff2d6);
-	color: var(--color-warning-element-light-text, #915d00);
-	border: 1px solid var(--color-warning-element, #e29300);
+	color: inherit;
+	border: none;
 }
 
 .moderate-chip {
 	background-color: var(--color-primary-element-light);
-	color: var(--color-primary-element-light-text);
-	border: 1px solid var(--color-primary-element);
+	color: inherit;
+	border: none;
 }
 
 .no-delegates {
@@ -1002,13 +1042,13 @@ async function reloadGroups() {
 
 .status-approved {
 	background-color: rgba(70, 186, 97, 0.15);
-	color: var(--color-success);
+	color: inherit;
 	border: 1px solid var(--color-success);
 }
 
 .status-rejected {
 	background-color: rgba(224, 76, 56, 0.15);
-	color: var(--color-error);
+	color: inherit;
 	border: 1px solid var(--color-error);
 }
 
@@ -1120,9 +1160,14 @@ async function reloadGroups() {
 	border-radius: 6px;
 }
 
-.creator-tag {
+.owner-tag {
 	background: var(--color-success-element);
 	color: var(--color-success-element-text);
+}
+
+.creator-tag {
+	background: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
 }
 
 .manage-tag {
@@ -1154,5 +1199,19 @@ async function reloadGroups() {
 		width: 100%;
 		justify-content: flex-start;
 	}
+}
+</style>
+
+<style>
+/* Position Toast Notifications in the top-right corner below #header */
+div[class*="_toastContainer_"],
+div[class*="toastContainer"],
+.toast-container {
+	top: calc(var(--header-height, 50px) + 12px) !important;
+	right: var(--body-container-margin, 20px) !important;
+	bottom: auto !important;
+	left: auto !important;
+	align-items: flex-end !important;
+	z-index: 100001 !important;
 }
 </style>

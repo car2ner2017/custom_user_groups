@@ -22,6 +22,7 @@ class AdminSettings implements ISettings {
 	#[\Override]
 	public function getForm(): TemplateResponse {
 		Util::addScript(Application::APP_ID, 'customusergroups-admin-settings');
+		Util::addStyle(Application::APP_ID, 'customusergroups-admin-settings');
 
 		$this->initialStateService->provideInitialState(
 			'customUserGroupsSettings',

@@ -146,6 +146,10 @@ class AuditService {
 		);
 	}
 
+	public function auditRequestCreated(string $groupId, string $groupName, string $candidateId, string $actorId): void {
+		$this->auditRequestSubmitted($groupId, $groupName, $candidateId, $actorId);
+	}
+
 	public function auditRequestApproved(string $groupId, string $groupName, string $candidateId, string $actorId): void {
 		$this->logAction(
 			'Membership request for user %s to group "%s" (%s) approved by %s',
@@ -165,6 +169,19 @@ class AuditService {
 				'candidate_id' => $candidateId,
 				'group_name' => $groupName,
 				'group_id' => $groupId,
+				'actor' => $actorId,
+			]
+		);
+	}
+
+	public function auditOwnershipTransferred(string $groupId, string $groupName, string $previousOwner, string $newOwner, string $actorId): void {
+		$this->logAction(
+			'Ownership of custom group "%s" (%s) transferred from %s to %s by %s',
+			[
+				'group_name' => $groupName,
+				'group_id' => $groupId,
+				'previous_owner' => $previousOwner,
+				'new_owner' => $newOwner,
 				'actor' => $actorId,
 			]
 		);

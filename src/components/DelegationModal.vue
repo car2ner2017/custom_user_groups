@@ -125,6 +125,15 @@
 					</div>
 				</div>
 			</div>
+
+			<!-- Modal Actions -->
+			<div class="modal-actions">
+				<NcButton
+					type="secondary"
+					@click="$emit('close')">
+					Закрыть
+				</NcButton>
+			</div>
 		</div>
 	</NcModal>
 </template>
@@ -194,10 +203,10 @@ const filteredDelegations = computed(() => {
 
 const filteredMembers = computed(() => {
 	if (!props.group) return []
-	const creatorId = props.group.creator_id
+	const ownerId = props.group.owner_id || props.group.creator_id
 	const delegatedUids = new Set(delegations.value.map((d) => d.user_id))
-	// Exclude creator and any member who already has delegated rights
-	const members = props.group.members.filter((m) => m.uid !== creatorId && !delegatedUids.has(m.uid))
+	// Exclude owner and any member who already has delegated rights
+	const members = props.group.members.filter((m) => m.uid !== ownerId && !delegatedUids.has(m.uid))
 	const query = memberSearchQuery.value.trim().toLowerCase()
 	if (!query) return members
 	return members.filter((m) => {
@@ -443,5 +452,13 @@ async function assignRights(uid: string) {
 	display: flex;
 	align-items: center;
 	gap: 8px;
+}
+
+.modal-actions {
+	display: flex;
+	justify-content: flex-end;
+	margin-top: 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--color-border);
 }
 </style>

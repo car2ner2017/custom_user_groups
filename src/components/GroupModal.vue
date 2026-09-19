@@ -25,6 +25,32 @@
 				</small>
 			</div>
 
+			<!-- Group Owner Field (Transfer ownership) -->
+			<div v-if="isEdit && canTransferOwnership" class="form-group">
+				<label for="group-owner" class="form-label">
+					Передать владение группой
+				</label>
+				<select
+					id="group-owner"
+					v-model="selectedNewOwnerId"
+					class="owner-select"
+					:disabled="loading">
+					<option value="">
+						— Не менять (текущий владелец: {{ currentOwnerDisplayName }}) —
+					</option>
+					<option
+						v-for="user in selectedUsers"
+						:key="user.uid"
+						:value="user.uid"
+						:disabled="user.uid === currentOwnerUid">
+						{{ user.displayName }} ({{ user.email || ('@' + user.uid) }}){{ user.uid === currentOwnerUid ? ' (Текущий владелец)' : '' }}
+					</option>
+				</select>
+				<small class="help-text">
+					Опционально. Выберите участника из списка, если хотите передать ему права владения группой.
+				</small>
+			</div>
+
 			<!-- Selected Group Members Section -->
 			<div class="form-group">
 				<label class="form-label">
@@ -135,6 +161,7 @@ import type { CustomGroup, UserOption } from '../types'
 const props = defineProps<{
 	show: boolean
 	group: CustomGroup | null
+	isAdmin?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -147,8 +174,23 @@ const canEditName = computed(() => {
 	if (!props.group) return true
 	return props.group.permissions ? props.group.permissions.can_edit_name : true
 })
+const canTransferOwnership = computed(() => {
+	if (!props.group) return false
+	return isEdit.value && Boolean(props.group.is_owner || props.isAdmin || props.group.permissions?.can_transfer_ownership)
+})
+
+const currentOwnerUid = computed(() => {
+	if (!props.group) return ''
+	return props.group.owner_id || props.group.creator_id || ''
+})
+
+const currentOwnerDisplayName = computed(() => {
+	if (!props.group) return ''
+	return props.group.owner_displayName || props.group.creator_displayName || currentOwnerUid.value
+})
 
 const name = ref('')
+const selectedNewOwnerId = ref<string>('')
 const selectedUsers = ref<UserOption[]>([])
 const selectedMembersFilter = ref('')
 const availableUsers = ref<UserOption[]>([])
@@ -163,13 +205,15 @@ watch(
 			if (props.group) {
 				name.value = props.group.name
 				selectedUsers.value = props.group.members.map((m) => ({ ...m }))
+				selectedNewOwnerId.value = ''
 			} else {
 				name.value = ''
 				selectedUsers.value = []
+				selectedNewOwnerId.value = ''
 			}
 			selectedMembersFilter.value = ''
 			userSearchQuery.value = ''
-			fetchUsers('')
+			fetchUsers()
 		}
 	},
 	{ immediate: true },
@@ -236,10 +280,19 @@ async function submitForm() {
 	try {
 		if (isEdit.value && props.group) {
 			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}`)
-			const response = await axios.put(url, {
+			const payload: { name: string; memberIds: string[]; newOwnerId?: string } = {
 				name: name.value.trim(),
 				memberIds,
-			})
+			}
+			if (canTransferOwnership.value && selectedNewOwnerId.value && selectedNewOwnerId.value !== currentOwnerUid.value) {
+				if (!selectedUsers.value.some((u) => u.uid === selectedNewOwnerId.value)) {
+					showError('Выбранный новый владелец должен быть участником группы')
+					loading.value = false
+					return
+				}
+				payload.newOwnerId = selectedNewOwnerId.value
+			}
+			const response = await axios.put(url, payload)
 			showSuccess('Группа успешно обновлена')
 			emit('saved', response.data)
 		} else {
@@ -385,5 +438,21 @@ async function submitForm() {
 	margin-top: 12px;
 	padding-top: 12px;
 	border-top: 1px solid var(--color-border);
+}
+
+.owner-select {
+	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	background-color: var(--color-main-background);
+	color: var(--color-main-text);
+	font-size: 14px;
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.owner-select:focus {
+	border-color: var(--color-primary-element);
+	outline: none;
 }
 </style>

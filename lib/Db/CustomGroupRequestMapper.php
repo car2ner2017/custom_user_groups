@@ -69,6 +69,10 @@ class CustomGroupRequestMapper extends QBMapper {
 		return $count > 0;
 	}
 
+	public function hasActiveRequest(string $groupId, string $candidateId): bool {
+		return $this->hasPendingRequest($groupId, $candidateId);
+	}
+
 	public function countPendingRequests(string $groupId): int {
 		$qb = $this->db->getQueryBuilder();
 		$qb->select($qb->createFunction('COUNT(*)'))
