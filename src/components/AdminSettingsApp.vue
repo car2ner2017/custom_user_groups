@@ -683,3 +683,17 @@ async function save() {
 	gap: 12px;
 }
 </style>
+
+<style>
+/* Position Toast Notifications in the top-right corner below #header */
+div[class*="_toastContainer_"],
+div[class*="toastContainer"],
+.toast-container {
+	top: calc(var(--header-height, 50px) + 12px) !important;
+	right: var(--body-container-margin, 20px) !important;
+	bottom: auto !important;
+	left: auto !important;
+	align-items: flex-end !important;
+	z-index: 100001 !important;
+}
+</style>
