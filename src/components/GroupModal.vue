@@ -221,13 +221,40 @@ const loadingUsers = ref(false)
 const showSelfRemoveConfirm = ref(false)
 const pendingRemoveUid = ref<string | null>(null)
 
+const hasChanges = computed(() => {
+	if (!props.group) {
+		return false
+	}
+	if (name.value.trim() !== (props.group.name || '').trim()) {
+		return true
+	}
+	if (selectedNewOwnerId.value !== '' && selectedNewOwnerId.value !== currentOwnerUid.value) {
+		return true
+	}
+	const originalUids = new Set(
+		props.group.members && props.group.members.length > 0
+			? props.group.members.map((m) => m.uid || m.id || '')
+			: (props.group.member_ids || [])
+	)
+	const currentUids = new Set(selectedUsers.value.map((u) => u.uid || u.id || ''))
+	if (originalUids.size !== currentUids.size) {
+		return true
+	}
+	for (const uid of originalUids) {
+		if (!currentUids.has(uid)) {
+			return true
+		}
+	}
+	return false
+})
+
 watch(
-	() => props.show,
-	(isOpen) => {
+	[() => props.show, () => props.group],
+	([isOpen, grp]) => {
 		if (isOpen) {
-			if (props.group) {
-				name.value = props.group.name
-				selectedUsers.value = props.group.members.map((m) => ({ ...m }))
+			if (grp) {
+				name.value = grp.name
+				selectedUsers.value = (grp.members || []).map((m) => ({ ...m }))
 				selectedNewOwnerId.value = ''
 			} else {
 				name.value = ''

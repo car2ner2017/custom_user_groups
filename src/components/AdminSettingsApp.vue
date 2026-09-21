@@ -443,14 +443,15 @@ const defaultSettings: AdminSettingsData = {
 	access_forbidden_groups: [],
 }
 
-const initialRaw = loadState<any>('customusergroups', 'customUserGroupsSettings', defaultSettings)
-const initialData: AdminSettingsData = initialRaw?.settings || initialRaw || defaultSettings
+const initialRaw = loadState<AdminSettingsResponse | AdminSettingsData>('customusergroups', 'customUserGroupsSettings', defaultSettings)
+const initialData: AdminSettingsData = (initialRaw && 'settings' in initialRaw) ? initialRaw.settings : (initialRaw as AdminSettingsData || defaultSettings)
+const initialDetails = (initialRaw && 'settings' in initialRaw) ? initialRaw : null
 
 const createRestrictionEnabled = ref(initialData.create_restriction_enabled ?? false)
 const createAllowedUsers = ref<string[]>(initialData.create_allowed_users || [])
 const createAllowedGroups = ref<string[]>(initialData.create_allowed_groups || [])
-const createAllowedUsersDetails = ref<UserOption[]>(initialRaw?.create_allowed_users_details || [])
-const createAllowedGroupsDetails = ref<GroupOption[]>(initialRaw?.create_allowed_groups_details || [])
+const createAllowedUsersDetails = ref<UserOption[]>(initialDetails?.create_allowed_users_details || [])
+const createAllowedGroupsDetails = ref<GroupOption[]>(initialDetails?.create_allowed_groups_details || [])
 
 const accessRestrictionEnabled = ref(initialData.access_restriction_enabled ?? false)
 const accessAllowedUsers = ref<string[]>(initialData.access_allowed_users || [])
