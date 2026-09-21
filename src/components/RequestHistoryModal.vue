@@ -289,12 +289,10 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .history-card.status-approved {
-	border: 1px solid var(--color-success);
 	border-left: 4px solid var(--color-success);
 }
 
 .history-card.status-rejected {
-	border: 1px solid var(--color-error);
 	border-left: 4px solid var(--color-error);
 }
 

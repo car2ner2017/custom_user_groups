@@ -337,29 +337,24 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .activity-card.type-member_add {
-	border: 1px solid var(--color-success);
 	border-left: 4px solid var(--color-success);
 }
 
 .activity-card.type-member_remove {
-	border: 1px solid var(--color-error);
 	border-left: 4px solid var(--color-error);
 }
 
 .activity-card.type-delegation_assign,
 .activity-card.type-delegation_revoke {
-	border: 1px solid var(--color-warning-element, #e29300);
 	border-left: 4px solid var(--color-warning-element, #e29300);
 }
 
 .activity-card.type-name_change,
 .activity-card.type-owner_transfer {
-	border: 1px solid var(--color-primary-element);
 	border-left: 4px solid var(--color-primary-element);
 }
 
 .activity-card.type-share_unshare {
-	border: 1px solid var(--color-error);
 	border-left: 4px solid var(--color-error);
 }
 
@@ -378,25 +373,25 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .tag-member_add {
-	border: 1px solid var(--color-success);
+	background-color: rgba(70, 186, 97, 0.15);
 }
 
 .tag-member_remove {
-	border: 1px solid var(--color-error);
+	background-color: rgba(224, 76, 56, 0.15);
 }
 
 .tag-delegation_assign,
 .tag-delegation_revoke {
-	border: 1px solid var(--color-warning-element, #e29300);
+	background-color: var(--color-warning-element-light, #fff2d6);
 }
 
 .tag-name_change,
 .tag-owner_transfer {
-	border: 1px solid var(--color-primary-element);
+	background-color: var(--color-primary-element-light);
 }
 
 .tag-share_unshare {
-	border: 1px solid var(--color-error);
+	background-color: rgba(224, 76, 56, 0.15);
 }
 
 .card-date {
