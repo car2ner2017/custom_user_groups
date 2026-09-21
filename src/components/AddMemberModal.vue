@@ -10,7 +10,7 @@
 			</h2>
 
 			<p class="form-description">
-				Выберите пользователей Nextcloud для непосредственного добавления в группу «{{ group.name }}».
+				Выберите пользователей для добавления в группу «{{ group.name }}».
 			</p>
 
 			<!-- Selected Users to Add Section -->
@@ -235,7 +235,7 @@ async function submitForm() {
 
 .form-label {
 	font-weight: 600;
-	font-size: 13px;
+	font-size: 14px;
 	color: var(--color-main-text);
 }
 
@@ -307,7 +307,7 @@ async function submitForm() {
 
 .user-displayname {
 	font-weight: 500;
-	font-size: 13px;
+	font-size: 14px;
 	color: var(--color-main-text);
 }
 

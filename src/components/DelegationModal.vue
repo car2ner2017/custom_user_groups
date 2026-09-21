@@ -15,7 +15,7 @@
 
 			<!-- Current Delegations Section -->
 			<div class="section-title">
-				<h3>Назначенные делегаты ({{ localDelegations.length }})</h3>
+				<h3>Делегированные пользователи ({{ localDelegations.length }})</h3>
 			</div>
 
 			<!-- Filter input for currently assigned delegates -->
@@ -96,7 +96,7 @@
 
 			<!-- Assign Rights Section -->
 			<div class="section-title">
-				<h3>Назначить делегата</h3>
+				<h3>Делегирование</h3>
 			</div>
 
 			<!-- Search filter for members -->
@@ -145,7 +145,7 @@
 							size="small"
 							:disabled="saving"
 							@click="assignRights(member)">
-							Назначить права
+							Делегировать
 						</NcButton>
 					</div>
 				</div>

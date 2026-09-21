@@ -145,7 +145,7 @@
 					<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
 					<div v-if="hasDelegates" class="delegation-meta-box">
 						<div class="delegation-line">
-							<span class="delegation-label">Делегаты с правами «Управление»:</span>
+							<span class="delegation-label">Управляющие:</span>
 							<span v-if="selectedGroup.delegates_manage?.length > 0" class="delegates-tags">
 								<span
 									v-for="d in selectedGroup.delegates_manage"
@@ -154,11 +154,11 @@
 									{{ d.displayName }} ({{ d.email || d.user_id }})
 								</span>
 							</span>
-							<span v-else class="no-delegates">Нет делегатов</span>
+							<span v-else class="no-delegates">Отсутствуют</span>
 						</div>
 
 						<div class="delegation-line">
-							<span class="delegation-label">Делегаты с правами «Модерация»:</span>
+							<span class="delegation-label">Модераторы:</span>
 							<span v-if="selectedGroup.delegates_moderate?.length > 0" class="delegates-tags">
 								<span
 									v-for="d in selectedGroup.delegates_moderate"
@@ -167,7 +167,7 @@
 									{{ d.displayName }} ({{ d.email || d.user_id }})
 								</span>
 							</span>
-							<span v-else class="no-delegates">Нет делегатов</span>
+							<span v-else class="no-delegates">Отсутствуют</span>
 						</div>
 					</div>
 				</header>
@@ -994,6 +994,8 @@ async function reloadGroups() {
 
 /* Membership Requests Section */
 .group-requests-section {
+	--color-success: #008C0B;
+	--color-error: #DA0000;
 	margin-top: 24px;
 	padding: 16px 20px;
 	background-color: var(--color-background-hover);
@@ -1047,6 +1049,8 @@ async function reloadGroups() {
 }
 
 .request-card {
+	--color-success: #008C0B;
+	--color-error: #DA0000;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
@@ -1077,12 +1081,12 @@ async function reloadGroups() {
 
 .candidate-name {
 	font-weight: 600;
-	font-size: 13px;
+	font-size: 14px;
 	color: var(--color-main-text);
 }
 
 .candidate-email {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
 
@@ -1090,7 +1094,7 @@ async function reloadGroups() {
 	display: flex;
 	flex-wrap: wrap;
 	justify-content: space-between;
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 	gap: 6px;
 }
@@ -1102,20 +1106,18 @@ async function reloadGroups() {
 }
 
 .status-badge {
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 600;
 	padding: 3px 8px;
 	border-radius: 10px;
 }
 
 .status-approved {
-	background-color: rgba(70, 186, 97, 0.15);
 	color: inherit;
 	border: 1px solid var(--color-success);
 }
 
 .status-rejected {
-	background-color: rgba(224, 76, 56, 0.15);
 	color: inherit;
 	border: 1px solid var(--color-error);
 }
@@ -1197,7 +1199,7 @@ async function reloadGroups() {
 }
 
 .member-display-name {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--color-main-text);
 	white-space: nowrap;
@@ -1206,7 +1208,7 @@ async function reloadGroups() {
 }
 
 .member-email {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 	white-space: nowrap;
 	overflow: hidden;

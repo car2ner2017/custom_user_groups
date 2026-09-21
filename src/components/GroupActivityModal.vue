@@ -98,7 +98,7 @@
 						<div v-if="act.action_type === 'name_change' && act.details?.old_name && act.details?.new_name" class="detail-row">
 							<span class="detail-label">Изменение:</span>
 							<span class="detail-value">
-								«{{ act.details.old_name }}» → «{{ act.details.new_name }}»
+								«{{ act.details.old_name }}» - «{{ act.details.new_name }}»
 							</span>
 						</div>
 
@@ -325,13 +325,15 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .activity-card {
-	padding: 12px 14px;
+	--color-success: #008C0B;
+	--color-error: #DA0000;
+	padding: 10px 14px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 	background-color: var(--color-main-background);
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 6px;
 }
 
 .activity-card.type-member_add {
@@ -399,7 +401,7 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .card-description {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 500;
 	color: var(--color-main-text);
 	line-height: 1.4;
@@ -411,7 +413,6 @@ function formatDate(dateStr?: string | null): string {
 	gap: 4px;
 	font-size: 12px;
 	padding-top: 4px;
-	border-top: 1px dashed var(--color-border);
 }
 
 .detail-row {

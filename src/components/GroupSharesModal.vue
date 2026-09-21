@@ -344,13 +344,13 @@ function formatDate(dateStr?: string | null | number): string {
 }
 
 .share-card {
-	padding: 12px 14px;
+	padding: 10px 14px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 	background-color: var(--color-main-background);
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 6px;
 }
 
 .share-card.type-folder {
@@ -405,10 +405,8 @@ function formatDate(dateStr?: string | null | number): string {
 
 .resource-path {
 	font-size: 12px;
-	color: var(--color-text-maxcontrast);
 	font-family: monospace;
 	word-break: break-all;
-	background-color: var(--color-background-hover);
 	padding: 3px 6px;
 	border-radius: var(--border-radius-element);
 }
@@ -419,7 +417,6 @@ function formatDate(dateStr?: string | null | number): string {
 	gap: 4px;
 	font-size: 12px;
 	padding-top: 4px;
-	border-top: 1px dashed var(--color-border);
 }
 
 .detail-row {

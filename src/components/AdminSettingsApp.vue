@@ -2,7 +2,7 @@
 	<div class="admin-settings-container">
 		<!-- Section 1: Group Creation Restriction -->
 		<NcSettingsSection
-			title="Ограничение создания пользовательских групп"
+			name="Настройка пользовательских групп"
 			description="Настройте, кто имеет право создавать новые пользовательские группы в системе.">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
@@ -143,7 +143,7 @@
 
 		<!-- Section 2: App Access Restriction -->
 		<NcSettingsSection
-			title="Ограничение доступа к приложению"
+			name="Ограничение доступа к приложению"
 			description="Настройте список пользователей и групп, которым запрещен доступ к веб-интерфейсу «Пользовательские группы».">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
@@ -550,11 +550,16 @@ async function save() {
 
 <style scoped>
 .admin-settings-container {
-	padding: 16px 0;
+	padding: 30px;
 	display: flex;
 	flex-direction: column;
-	gap: 24px;
+	gap: 14px;
 	max-width: 900px;
+}
+
+:deep(.settings-section),
+.settings-section {
+	margin: 0 !important;
 }
 
 .settings-content {

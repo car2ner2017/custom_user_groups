@@ -277,14 +277,15 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .history-card {
-	padding: 12px 14px;
+	--color-success: #008C0B;
+	--color-error: #DA0000;
+	padding: 10px 14px;
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 	background-color: var(--color-main-background);
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	transition: box-shadow 0.15s ease;
+	gap: 6px;
 }
 
 .history-card.status-approved {
