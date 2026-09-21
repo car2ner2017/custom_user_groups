@@ -218,29 +218,6 @@ const userSearchQuery = ref('')
 const loading = ref(false)
 const loadingUsers = ref(false)
 
-const hasChanges = computed(() => {
-	if (!props.group) {
-		return true
-	}
-	if (name.value.trim() !== props.group.name.trim()) {
-		return true
-	}
-	if (selectedNewOwnerId.value !== '' && selectedNewOwnerId.value !== currentOwnerUid.value) {
-		return true
-	}
-	const originalUids = new Set(props.group.members.map((m) => m.uid))
-	const currentUids = new Set(selectedUsers.value.map((u) => u.uid))
-	if (originalUids.size !== currentUids.size) {
-		return true
-	}
-	for (const uid of originalUids) {
-		if (!currentUids.has(uid)) {
-			return true
-		}
-	}
-	return false
-})
-
 const showSelfRemoveConfirm = ref(false)
 const pendingRemoveUid = ref<string | null>(null)
 
@@ -524,7 +501,7 @@ async function submitForm() {
 
 .user-displayname {
 	font-weight: 500;
-	font-size: 14px;
+	font-size: 13px;
 	color: var(--color-main-text);
 }
 

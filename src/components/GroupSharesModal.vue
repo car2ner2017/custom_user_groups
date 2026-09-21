@@ -354,10 +354,12 @@ function formatDate(dateStr?: string | null | number): string {
 }
 
 .share-card.type-folder {
+	border: 1px solid var(--color-primary-element);
 	border-left: 4px solid var(--color-primary-element);
 }
 
 .share-card.type-file {
+	border: 1px solid var(--color-text-maxcontrast);
 	border-left: 4px solid var(--color-text-maxcontrast);
 }
 
@@ -394,13 +396,13 @@ function formatDate(dateStr?: string | null | number): string {
 }
 
 .tag-folder {
-	background-color: var(--color-primary-element-light);
 	color: inherit;
+	border: 1px solid var(--color-primary-element);
 }
 
 .tag-file {
-	background-color: var(--color-background-hover);
 	color: inherit;
+	border: 1px solid var(--color-text-maxcontrast);
 }
 
 .resource-path {
