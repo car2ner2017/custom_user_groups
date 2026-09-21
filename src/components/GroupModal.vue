@@ -234,7 +234,7 @@ const hasChanges = computed(() => {
 	const originalUids = new Set(
 		props.group.members && props.group.members.length > 0
 			? props.group.members.map((m) => m.uid || m.id || '')
-			: (props.group.member_ids || [])
+			: (props.group.member_ids || []),
 	)
 	const currentUids = new Set(selectedUsers.value.map((u) => u.uid || u.id || ''))
 	if (originalUids.size !== currentUids.size) {
@@ -437,7 +437,7 @@ async function submitForm() {
 }
 
 .required {
-	color: var(--color-error);
+	color: var(--color-text-error, var(--color-error));
 }
 
 .form-title {

@@ -289,11 +289,11 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .history-card.status-approved {
-	border-left: 4px solid var(--color-success);
+	border-left: 4px solid var(--color-border-success, var(--color-success));
 }
 
 .history-card.status-rejected {
-	border-left: 4px solid var(--color-error);
+	border-left: 4px solid var(--color-border-error, var(--color-error));
 }
 
 .card-header {
@@ -328,12 +328,12 @@ function formatDate(dateStr?: string | null): string {
 
 .tag-approved {
 	color: inherit;
-	border: 1px solid var(--color-success);
+	border: 1px solid var(--color-border-success, var(--color-success));
 }
 
 .tag-rejected {
 	color: inherit;
-	border: 1px solid var(--color-error);
+	border: 1px solid var(--color-border-error, var(--color-error));
 }
 
 .card-details {

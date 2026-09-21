@@ -337,11 +337,11 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .activity-card.type-member_add {
-	border-left: 4px solid var(--color-success);
+	border-left: 4px solid var(--color-border-success, var(--color-success));
 }
 
 .activity-card.type-member_remove {
-	border-left: 4px solid var(--color-error);
+	border-left: 4px solid var(--color-border-error, var(--color-error));
 }
 
 .activity-card.type-delegation_assign,
@@ -355,7 +355,7 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .activity-card.type-share_unshare {
-	border-left: 4px solid var(--color-error);
+	border-left: 4px solid var(--color-border-error, var(--color-error));
 }
 
 .card-header {
