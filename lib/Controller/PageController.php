@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace OCA\CustomUserGroups\Controller;
 
+use DateTime;
 use OCA\CustomUserGroups\AppInfo\Application;
+use OCA\CustomUserGroups\Db\CustomGroupDelegation;
+use OCA\CustomUserGroups\Db\CustomGroupDelegationMapper;
 use OCA\CustomUserGroups\Db\CustomGroupMapper;
+use OCA\CustomUserGroups\Db\CustomGroupRequestMapper;
 use OCA\CustomUserGroups\Service\SettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
@@ -30,6 +34,8 @@ class PageController extends Controller {
 		private IInitialState $initialStateService,
 		private IGroupManager $groupManager,
 		private CustomGroupMapper $mapper,
+		private CustomGroupDelegationMapper $delegationMapper,
+		private CustomGroupRequestMapper $requestMapper,
 		private IUserManager $userManager,
 		private SettingsService $settingsService,
 		private ?string $userId,
@@ -73,21 +79,82 @@ class PageController extends Controller {
 
 			$isOwner = ($ownerId === $this->userId);
 			$isCreator = ($g['creator_id'] === $this->userId);
+			$currentUid = (string)($this->userId ?? '');
+			$delegation = $this->delegationMapper->getDelegation($g['group_id'], $currentUid);
+			$isMember = in_array($currentUid, $g['member_ids'], true);
+			$userDelegationLevel = ($isMember && $delegation) ? $delegation->getLevel() : null;
+
+			$canManage = $isOwner || $isAdmin || ($userDelegationLevel === 'manage');
+			$canModerate = $canManage || ($userDelegationLevel === 'moderate');
+			$canDelegate = $isOwner || $isAdmin || ($userDelegationLevel === 'manage');
+			$canRequest = $isMember || $isOwner || $isAdmin;
+			$canViewHistory = $isOwner || $isAdmin || ($userDelegationLevel === 'manage');
+			$canManageShares = $isOwner || $isAdmin || ($userDelegationLevel === 'manage');
+
+			$rawDelegations = $this->delegationMapper->getDelegations($g['group_id']);
+			$delegations = [];
+			$delegatesManage = [];
+			$delegatesModerate = [];
+			foreach ($rawDelegations as $del) {
+				$delUid = (string)$del->getUserId();
+				if (!in_array($delUid, $g['member_ids'], true)) {
+					continue;
+				}
+				$delUser = $this->userManager->get($delUid);
+				$delData = [
+					'id' => $del->getId(),
+					'group_id' => $g['group_id'],
+					'user_id' => $delUid,
+					'displayName' => $delUser ? $delUser->getDisplayName() : $delUid,
+					'email' => ($delUser && $delUser->getEMailAddress()) ? $delUser->getEMailAddress() : '',
+					'level' => $del->getLevel(),
+					'created_at' => $del->getCreatedAt()?->format(DateTime::ATOM),
+				];
+				$delegations[] = $delData;
+				if ($del->getLevel() === CustomGroupDelegation::LEVEL_MANAGE) {
+					$delegatesManage[] = $delData;
+				} elseif ($del->getLevel() === CustomGroupDelegation::LEVEL_MODERATE) {
+					$delegatesModerate[] = $delData;
+				}
+			}
+
+			$pendingCount = 0;
+			if ($canModerate) {
+				$pendingCount = $this->requestMapper->countPendingRequests($g['group_id']);
+			}
 
 			$groups[] = [
 				'group_id' => $g['group_id'],
 				'name' => $g['name'],
 				'creator_id' => $g['creator_id'],
 				'creator_displayName' => $creatorUser ? $creatorUser->getDisplayName() : $g['creator_id'],
+				'creator_email' => ($creatorUser && $creatorUser->getEMailAddress()) ? $creatorUser->getEMailAddress() : '',
 				'owner_id' => $ownerId,
 				'owner_displayName' => $ownerUser ? $ownerUser->getDisplayName() : $ownerId,
+				'owner_email' => ($ownerUser && $ownerUser->getEMailAddress()) ? $ownerUser->getEMailAddress() : '',
 				'created_at' => $g['created_at'],
 				'member_ids' => $g['member_ids'],
 				'members' => $members,
 				'member_count' => count($members),
-				'can_edit' => $isOwner || $isAdmin,
+				'can_edit' => $canModerate,
 				'is_owner' => $isOwner,
 				'is_creator' => $isCreator,
+				'delegations' => $delegations,
+				'delegates_manage' => $delegatesManage,
+				'delegates_moderate' => $delegatesModerate,
+				'pending_requests_count' => $pendingCount,
+				'permissions' => [
+					'can_edit_name' => $canManage,
+					'can_edit_members' => $canModerate,
+					'can_delete' => $canManage,
+					'can_delegate' => $canDelegate,
+					'can_moderate_requests' => $canModerate,
+					'can_request_member' => $canRequest,
+					'can_transfer_ownership' => ($isOwner || $isAdmin),
+					'can_view_history' => $canViewHistory,
+					'can_manage_shares' => $canManageShares,
+					'delegation_level' => $userDelegationLevel,
+				],
 			];
 		}
 

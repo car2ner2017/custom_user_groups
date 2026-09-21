@@ -49,9 +49,6 @@
 						{{ user.displayName }} ({{ user.email || ('@' + user.uid) }}){{ user.uid === currentOwnerUid ? ' (Текущий владелец)' : '' }}
 					</option>
 				</select>
-				<small class="help-text">
-					Опционально. Выберите участника из списка, если хотите передать ему права владения группой.
-				</small>
 			</div>
 
 			<!-- Selected Group Members Section -->
@@ -60,8 +57,8 @@
 					Участники группы ({{ selectedUsers.length }})
 				</label>
 
-				<!-- Filter input for already selected members -->
-				<div v-if="selectedUsers.length > 0" class="filter-selected-wrapper">
+				<!-- Filter input for already selected members (only in edit mode) -->
+				<div v-if="isEdit && selectedUsers.length > 0" class="filter-selected-wrapper">
 					<NcTextField
 						v-model="selectedMembersFilter"
 						placeholder="Поиск участников группы (по имени, email или логину)..."
@@ -92,7 +89,7 @@
 					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					Участники еще не выбраны. Вы можете найти и добавить их из списка ниже.
+					Участники еще не выбраны. Добавьте их из списка ниже.
 				</div>
 
 				<!-- Search users input for adding new members -->
@@ -147,6 +144,15 @@
 				</NcButton>
 			</div>
 		</form>
+
+		<!-- Self-removal Warning Modal -->
+		<ConfirmModal
+			:show="showSelfRemoveConfirm"
+			title="Предупреждение"
+			message="Внимание: вы удаляете себя из этой пользовательской группы. После сохранения вы потеряете доступ к группе и делегированные права управления/модерации, если они были назначены."
+			confirm-text="Удалить себя"
+			@close="cancelSelfRemoval"
+			@confirm="confirmSelfRemoval" />
 	</NcModal>
 </template>
 
@@ -159,12 +165,14 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import ConfirmModal from './ConfirmModal.vue'
 import type { CustomGroup, UserOption } from '../types'
 
 const props = defineProps<{
 	show: boolean
 	group: CustomGroup | null
 	isAdmin?: boolean
+	currentUserId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -206,6 +214,9 @@ const userSearchQuery = ref('')
 const loading = ref(false)
 const loadingUsers = ref(false)
 
+const showSelfRemoveConfirm = ref(false)
+const pendingRemoveUid = ref<string | null>(null)
+
 watch(
 	() => props.show,
 	(isOpen) => {
@@ -223,6 +234,8 @@ watch(
 			userSearchQuery.value = ''
 			fetchUsers()
 		}
+		showSelfRemoveConfirm.value = false
+		pendingRemoveUid.value = null
 	},
 	{ immediate: true },
 )
@@ -272,8 +285,51 @@ function addUser(user: UserOption) {
 	}
 }
 
+function cancelSelfRemoval() {
+	showSelfRemoveConfirm.value = false
+	pendingRemoveUid.value = null
+}
+
+function confirmSelfRemoval() {
+	if (pendingRemoveUid.value) {
+		const uid = pendingRemoveUid.value
+		selectedUsers.value = selectedUsers.value.filter((u) => u.uid !== uid)
+		if (selectedNewOwnerId.value === uid) {
+			selectedNewOwnerId.value = ''
+		}
+	}
+	showSelfRemoveConfirm.value = false
+	pendingRemoveUid.value = null
+}
+
 function removeUser(uid: string) {
+	if (isEdit.value && props.group) {
+		const isOwner = (uid === currentOwnerUid.value)
+		// Owner cannot be removed without transferring ownership first
+		if (isOwner && (!selectedNewOwnerId.value || selectedNewOwnerId.value === currentOwnerUid.value)) {
+			showError('Владелец группы не может быть удален из списка участников. Для этого необходимо сначала передать владение группой другому участнику.')
+			return
+		}
+
+		// Check if user is removing themselves and has manage or moderate role
+		const isSelf = Boolean(props.currentUserId && uid === props.currentUserId)
+		const userDelegationLevel = props.group.permissions?.delegation_level
+		const isDelegate = props.group.delegations?.some((d) => d.user_id === uid)
+			|| props.group.delegates_manage?.some((d) => d.user_id === uid)
+			|| props.group.delegates_moderate?.some((d) => d.user_id === uid)
+		const isManagerOrModerator = userDelegationLevel === 'manage' || userDelegationLevel === 'moderate' || isDelegate
+
+		if (isSelf && (isManagerOrModerator || isOwner)) {
+			pendingRemoveUid.value = uid
+			showSelfRemoveConfirm.value = true
+			return
+		}
+	}
+
 	selectedUsers.value = selectedUsers.value.filter((u) => u.uid !== uid)
+	if (selectedNewOwnerId.value === uid) {
+		selectedNewOwnerId.value = ''
+	}
 }
 
 async function submitForm() {
@@ -366,7 +422,6 @@ async function submitForm() {
 }
 
 .text-warning {
-	color: var(--color-warning, #e29300);
 }
 
 .filter-selected-wrapper {
@@ -376,8 +431,11 @@ async function submitForm() {
 .selected-users-list {
 	display: flex;
 	flex-direction: column;
+	gap: 6px;
 	max-height: 160px;
 	overflow-y: auto;
+	padding: 8px;
+	background-color: var(--color-background-hover);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 }
@@ -386,35 +444,45 @@ async function submitForm() {
 .no-filtered-selected {
 	font-size: 13px;
 	color: var(--color-text-maxcontrast);
-	font-style: italic;
-	padding: 6px 0;
+	padding: 8px 12px;
+	background-color: var(--color-background-hover);
+	border-radius: var(--border-radius-element);
 }
 
 .search-user-wrapper {
-	margin-top: 10px;
+	margin-top: 4px;
+}
+
+.loading-users,
+.empty-users {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 12px;
+	font-size: 13px;
+	color: var(--color-text-maxcontrast);
+	background: var(--color-background-hover);
+	border-radius: var(--border-radius-element);
 }
 
 .available-users-list {
 	display: flex;
 	flex-direction: column;
-	max-height: 160px;
+	gap: 6px;
+	max-height: 200px;
 	overflow-y: auto;
-	border: 1px solid var(--color-border);
-	border-radius: var(--border-radius-element);
-	margin-top: 4px;
 }
 
 .user-item {
 	display: flex;
-	align-items: center;
 	justify-content: space-between;
+	align-items: center;
 	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
 	cursor: pointer;
-	border-bottom: 1px solid var(--color-border);
-}
-
-.user-item:last-child {
-	border-bottom: none;
+	background: var(--color-main-background);
 }
 
 .user-item:hover {
@@ -424,6 +492,7 @@ async function submitForm() {
 .user-item-info {
 	display: flex;
 	flex-direction: column;
+	gap: 2px;
 }
 
 .user-displayname {
@@ -433,15 +502,7 @@ async function submitForm() {
 }
 
 .user-email-uid {
-	font-size: 11px;
-	color: var(--color-text-maxcontrast);
-}
-
-.loading-users,
-.empty-users {
-	padding: 10px;
-	text-align: center;
-	font-size: 13px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
 

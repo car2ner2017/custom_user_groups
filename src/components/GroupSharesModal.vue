@@ -59,7 +59,6 @@
 					:class="'type-' + share.item_type">
 					<div class="card-header">
 						<div class="resource-title-wrapper">
-							<span class="resource-icon">{{ share.item_type === 'folder' ? '📁' : '📄' }}</span>
 							<span class="resource-name" :title="share.name">{{ share.name }}</span>
 							<span class="type-tag" :class="'tag-' + share.item_type">
 								{{ share.item_type === 'folder' ? 'Папка' : 'Файл' }}
@@ -75,25 +74,25 @@
 					</div>
 
 					<div v-if="share.path" class="resource-path" :title="share.path">
-						{{ share.path }}
+						Путь: {{ share.path }}
 					</div>
 
 					<div class="card-details">
 						<div class="detail-row">
-							<span class="detail-label">Владелец:</span>
+							<span class="detail-label">Инициатор:</span>
 							<span class="detail-value font-semibold">
-								{{ share.owner_displayName }}
-								<span class="detail-sub">({{ share.owner_email || ('@' + share.uid_owner) }})</span>
+								{{ share.initiator_displayName || share.owner_displayName }}
+								<span class="detail-sub">({{ share.initiator_email || share.owner_email || ('@' + (share.uid_initiator || share.uid_owner)) }})</span>
 							</span>
 						</div>
 
 						<div
-							v-if="share.uid_initiator && share.uid_initiator !== share.uid_owner"
+							v-if="share.uid_owner && share.uid_initiator && share.uid_owner !== share.uid_initiator"
 							class="detail-row">
-							<span class="detail-label">Предоставил:</span>
+							<span class="detail-label">Владелец файла:</span>
 							<span class="detail-value">
-								{{ share.initiator_displayName }}
-								<span class="detail-sub">({{ share.initiator_email || ('@' + share.uid_initiator) }})</span>
+								{{ share.owner_displayName }}
+								<span class="detail-sub">({{ share.owner_email || ('@' + share.uid_owner) }})</span>
 							</span>
 						</div>
 
@@ -377,12 +376,6 @@ function formatDate(dateStr?: string | null | number): string {
 	overflow: hidden;
 }
 
-.resource-icon {
-	font-size: 18px;
-	line-height: 1;
-	flex-shrink: 0;
-}
-
 .resource-name {
 	font-size: 14px;
 	font-weight: 600;
@@ -460,4 +453,3 @@ function formatDate(dateStr?: string | null | number): string {
 	margin-top: 8px;
 }
 </style>
-

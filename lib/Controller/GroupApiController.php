@@ -30,6 +30,7 @@ use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\Share\Exceptions\ShareNotFound;
 use OCP\Share\IManager;
 use OCP\Share\IShare;
 
@@ -468,9 +469,33 @@ class GroupApiController extends Controller {
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Делегирование прав доступно только создателю группы или администратору'],
+				['error' => 'Делегирование прав доступно только владельцу группы, управляющему или администратору'],
 				Http::STATUS_FORBIDDEN
 			);
+		}
+
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		$isOwner = ($ownerId === $currentUid);
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$userDelegationLevel = $this->getDelegationLevel($groupId, $currentUid);
+		$isManagerOnly = (!$isOwner && !$isAdmin && $userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
+
+		// If user is a manager (not owner/admin), they can only assign LEVEL_MODERATE
+		if ($isManagerOnly) {
+			if ($level !== CustomGroupDelegation::LEVEL_MODERATE) {
+				return new JSONResponse(
+					['error' => 'Управляющий может назначать права только с ролью «Модератор»'],
+					Http::STATUS_FORBIDDEN
+				);
+			}
+
+			$existing = $this->delegationMapper->getDelegation($groupId, $userId);
+			if ($existing !== null && $existing->getLevel() === CustomGroupDelegation::LEVEL_MANAGE) {
+				return new JSONResponse(
+					['error' => 'Управляющий не может изменять права других управляющих'],
+					Http::STATUS_FORBIDDEN
+				);
+			}
 		}
 
 		// Strictly only active members of this group can be delegates
@@ -540,13 +565,26 @@ class GroupApiController extends Controller {
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Отзыв прав доступен только создателю группы или администратору'],
+				['error' => 'Отзыв прав доступен только владельцу группы, управляющему или администратору'],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		$isOwner = ($ownerId === $currentUid);
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+		$userDelegationLevel = $this->getDelegationLevel($groupId, $currentUid);
+		$isManagerOnly = (!$isOwner && !$isAdmin && $userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
+
 		$existing = $this->delegationMapper->getDelegation($groupId, $userId);
 		if ($existing !== null) {
+			if ($isManagerOnly && $existing->getLevel() !== CustomGroupDelegation::LEVEL_MODERATE) {
+				return new JSONResponse(
+					['error' => 'Управляющий может отзывать права только у модераторов'],
+					Http::STATUS_FORBIDDEN
+				);
+			}
+
 			$this->delegationMapper->revokeDelegation($groupId, $userId);
 			$this->auditService->auditDelegationRevoked($groupId, $group['name'], $userId, $existing->getLevel(), $currentUid);
 			$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_DELEGATION_REVOKE, $currentUid, $userId, [
@@ -977,8 +1015,8 @@ class GroupApiController extends Controller {
 		}
 
 		try {
-			$share = $this->shareManager->getShareById((string)$shareId);
-		} catch (Exception) {
+			$share = $this->resolveShare($shareId);
+		} catch (ShareNotFound|Exception) {
 			return new JSONResponse(['error' => 'Ресурс общего доступа не найден'], Http::STATUS_NOT_FOUND);
 		}
 
@@ -1028,6 +1066,37 @@ class GroupApiController extends Controller {
 		return new JSONResponse(['success' => true]);
 	}
 
+	/**
+	 * Resolves an IShare instance by numeric ID or composite provider ID.
+	 *
+	 * @throws ShareNotFound
+	 */
+	private function resolveShare(string|int $shareId): IShare {
+		$idStr = (string)$shareId;
+		if (str_contains($idStr, ':')) {
+			return $this->shareManager->getShareById($idStr);
+		}
+
+		$providers = [
+			'ocinternal',
+			'ocCircleShare',
+			'ocMailShare',
+			'ocRoomShare',
+			'deck',
+		];
+		foreach ($providers as $prefix) {
+			try {
+				return $this->shareManager->getShareById($prefix . ':' . $idStr);
+			} catch (ShareNotFound) {
+				continue;
+			} catch (Exception) {
+				continue;
+			}
+		}
+
+		throw new ShareNotFound();
+	}
+
 	// ==========================================
 	// PERMISSION HELPERS & DATA ENRICHMENT
 	// ==========================================
@@ -1042,6 +1111,15 @@ class GroupApiController extends Controller {
 		return $this->getDelegationLevel($group['group_id'], $userId) === CustomGroupDelegation::LEVEL_MANAGE;
 	}
 
+	private function canManageGroupShares(array $group, string $userId): bool {
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		if ($ownerId === $userId || $this->groupManager->isAdmin($userId)) {
+			return true;
+		}
+
+		return $this->getDelegationLevel($group['group_id'], $userId) === CustomGroupDelegation::LEVEL_MANAGE;
+	}
+
 	private function canModerateGroup(array $group, string $userId): bool {
 		if ($this->canManageGroup($group, $userId)) {
 			return true;
@@ -1053,7 +1131,11 @@ class GroupApiController extends Controller {
 
 	private function canManageDelegations(array $group, string $userId): bool {
 		$ownerId = $group['owner_id'] ?? $group['creator_id'];
-		return ($ownerId === $userId) || $this->groupManager->isAdmin($userId);
+		if ($ownerId === $userId || $this->groupManager->isAdmin($userId)) {
+			return true;
+		}
+
+		return $this->getDelegationLevel($group['group_id'], $userId) === CustomGroupDelegation::LEVEL_MANAGE;
 	}
 
 	private function canRequestMember(array $group, string $userId): bool {
@@ -1170,10 +1252,11 @@ class GroupApiController extends Controller {
 
 		$canManage = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
 		$canModerate = $canManage || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MODERATE);
-		$canDelegate = $isOwner || $isAdmin;
+		$canDelegate = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
 		$isMember = $this->mapper->isMember($group['group_id'], $currentUserId);
 		$canRequest = $isMember || $isOwner || $isAdmin;
 		$canViewHistory = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
+		$canManageShares = $isOwner || $isAdmin || ($userDelegationLevel === CustomGroupDelegation::LEVEL_MANAGE);
 		$pendingCount = $this->requestMapper->countPendingRequests($group['group_id']);
 
 		return [
@@ -1205,6 +1288,7 @@ class GroupApiController extends Controller {
 				'can_request_member' => $canRequest,
 				'can_transfer_ownership' => ($isOwner || $isAdmin),
 				'can_view_history' => $canViewHistory,
+				'can_manage_shares' => $canManageShares,
 				'delegation_level' => $userDelegationLevel,
 			],
 		];

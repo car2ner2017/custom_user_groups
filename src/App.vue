@@ -108,17 +108,20 @@
 
 					<div v-if="hasGroupActions" class="group-header-actions">
 						<NcButton
-							v-if="selectedGroup.permissions?.can_manage_shares"
-							type="tertiary"
-							@click="showSharesModal = true">
-							Общие ресурсы
-						</NcButton>
-						<NcButton
 							v-if="selectedGroup.permissions?.can_view_history"
 							type="tertiary"
 							@click="showActivityModal = true">
 							История действий
 						</NcButton>
+						<NcButton
+							v-if="selectedGroup.permissions?.can_manage_shares"
+							type="tertiary"
+							@click="showSharesModal = true">
+							Общие ресурсы
+						</NcButton>
+						<div
+							v-if="hasLeadingActions && hasTrailingActions"
+							class="action-divider" />
 						<NcButton
 							v-if="selectedGroup.permissions?.can_delegate"
 							type="tertiary"
@@ -345,6 +348,7 @@
 			:show="showGroupModal"
 			:group="modalGroup"
 			:is-admin="isAdmin"
+			:current-user-id="currentUserId"
 			@close="showGroupModal = false"
 			@saved="onGroupSaved" />
 
@@ -353,6 +357,7 @@
 			v-if="selectedGroup"
 			:show="showDelegationModal"
 			:group="selectedGroup"
+			:is-admin="isAdmin"
 			@close="showDelegationModal = false"
 			@updated="onDelegationUpdated" />
 
@@ -529,6 +534,16 @@ const hasGroupActions = computed(() => {
 	return Boolean(p?.can_manage_shares || p?.can_view_history || p?.can_delegate || p?.can_edit_members || p?.can_edit_name || p?.can_delete)
 })
 
+const hasLeadingActions = computed(() => {
+	const p = selectedGroup.value?.permissions
+	return Boolean(p?.can_view_history || p?.can_manage_shares)
+})
+
+const hasTrailingActions = computed(() => {
+	const p = selectedGroup.value?.permissions
+	return Boolean(p?.can_delegate || p?.can_edit_members || p?.can_edit_name || p?.can_delete)
+})
+
 const pendingRequestsCount = computed(() => {
 	return groupRequests.value.filter((r) => r.status === 'pending').length
 })
@@ -585,7 +600,7 @@ async function refreshGroupData(groupId: string) {
 			const updated = response.data.group as CustomGroup
 			const idx = allGroups.value.findIndex((g) => g.group_id === groupId)
 			if (idx !== -1) {
-				allGroups.value[idx] = updated
+				allGroups.value.splice(idx, 1, updated)
 			} else {
 				allGroups.value.push(updated)
 			}
@@ -967,6 +982,14 @@ async function reloadGroups() {
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 10px;
+}
+
+.action-divider {
+	width: 1px;
+	height: 20px;
+	background-color: var(--color-border);
+	margin: 0 2px;
+	align-self: center;
 }
 
 /* Membership Requests Section */

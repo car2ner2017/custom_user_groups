@@ -15,11 +15,11 @@
 
 			<!-- Current Delegations Section -->
 			<div class="section-title">
-				<h3>Назначенные делегаты ({{ delegations.length }})</h3>
+				<h3>Назначенные делегаты ({{ localDelegations.length }})</h3>
 			</div>
 
 			<!-- Filter input for currently assigned delegates -->
-			<div v-if="delegations.length > 0" class="filter-delegates-wrapper">
+			<div v-if="localDelegations.length > 0" class="filter-delegates-wrapper">
 				<NcTextField
 					v-model="delegatesFilter"
 					placeholder="Поиск среди назначенных делегатов (по имени, email или логину)..."
@@ -29,7 +29,7 @@
 			<div v-if="loadingDelegations" class="loading-state">
 				<NcLoadingIcon :size="24" /> Загрузка делегатов...
 			</div>
-			<div v-else-if="delegations.length === 0" class="empty-state">
+			<div v-else-if="localDelegations.length === 0" class="empty-state">
 				В группе пока нет назначенных делегатов.
 			</div>
 			<div v-else-if="filteredDelegations.length === 0" class="empty-state">
@@ -46,27 +46,48 @@
 					</div>
 
 					<div class="delegate-actions">
-						<select
-							class="level-select"
-							:value="del.level"
-							:disabled="updatingUid === del.user_id"
-							@change="onLevelChange(del.user_id, ($event.target as HTMLSelectElement).value)">
-							<option value="manage">
-								Управление
-							</option>
-							<option value="moderate">
-								Модерация
-							</option>
-						</select>
+						<!-- If manager viewing another manager: only show static label, cannot change or revoke -->
+						<template v-if="isManagerOnly && del.level === 'manage'">
+							<span class="static-level-chip manage-chip">Управление</span>
+						</template>
 
-						<NcButton
-							type="tertiary-no-background"
-							size="small"
-							title="Отозвать права"
-							:disabled="updatingUid === del.user_id"
-							@click="revoke(del.user_id)">
-							Отозвать
-						</NcButton>
+						<!-- If manager viewing a moderator: show static label and revoke button -->
+						<template v-else-if="isManagerOnly && del.level === 'moderate'">
+							<span class="static-level-chip moderate-chip">Модерация</span>
+							<NcButton
+								type="tertiary-no-background"
+								size="small"
+								title="Отозвать права"
+								:disabled="saving"
+								@click="revoke(del.user_id)">
+								Отозвать
+							</NcButton>
+						</template>
+
+						<!-- If owner or admin: allow selecting level or revoking -->
+						<template v-else>
+							<select
+								class="level-select"
+								:value="del.level"
+								:disabled="saving"
+								@change="onLevelChange(del.user_id, ($event.target as HTMLSelectElement).value)">
+								<option value="manage">
+									Управление
+								</option>
+								<option value="moderate">
+									Модерация
+								</option>
+							</select>
+
+							<NcButton
+								type="tertiary-no-background"
+								size="small"
+								title="Отозвать права"
+								:disabled="saving"
+								@click="revoke(del.user_id)">
+								Отозвать
+							</NcButton>
+						</template>
 					</div>
 				</div>
 			</div>
@@ -83,7 +104,7 @@
 				<NcTextField
 					v-model="memberSearchQuery"
 					placeholder="Поиск среди участников группы для назначения прав..."
-					:disabled="assigningUid !== null" />
+					:disabled="saving" />
 			</div>
 
 			<!-- Candidate Members List -->
@@ -104,9 +125,10 @@
 
 					<div class="member-assign-controls">
 						<select
+							v-if="!isManagerOnly"
 							v-model="memberLevels[member.uid]"
 							class="level-select"
-							:disabled="assigningUid === member.uid">
+							:disabled="saving">
 							<option value="manage">
 								Управление
 							</option>
@@ -114,13 +136,16 @@
 								Модерация
 							</option>
 						</select>
+						<span v-else class="static-level-chip moderate-chip">
+							Модерация
+						</span>
 
 						<NcButton
 							type="tertiary"
 							size="small"
-							:disabled="assigningUid === member.uid"
-							@click="assignRights(member.uid)">
-							{{ assigningUid === member.uid ? 'Сохранение...' : 'Назначить права' }}
+							:disabled="saving"
+							@click="assignRights(member)">
+							Назначить права
 						</NcButton>
 					</div>
 				</div>
@@ -130,8 +155,15 @@
 			<div class="modal-actions">
 				<NcButton
 					type="secondary"
+					:disabled="saving"
 					@click="$emit('close')">
-					Закрыть
+					Отмена
+				</NcButton>
+				<NcButton
+					type="primary"
+					:disabled="saving || loadingDelegations || !hasChanges"
+					@click="saveChanges">
+					{{ saving ? 'Сохранение...' : 'Сохранить' }}
 				</NcButton>
 			</div>
 		</div>
@@ -147,11 +179,12 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
-import type { CustomGroup, Delegation } from '../types'
+import type { CustomGroup, Delegation, UserOption } from '../types'
 
 const props = defineProps<{
 	show: boolean
 	group: CustomGroup
+	isAdmin?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -159,13 +192,21 @@ const emit = defineEmits<{
 	(e: 'updated'): void
 }>()
 
-const delegations = ref<Delegation[]>([])
+const isOwnerOrAdmin = computed(() => {
+	return Boolean(props.group?.is_owner || props.isAdmin)
+})
+
+const isManagerOnly = computed(() => {
+	return !isOwnerOrAdmin.value && props.group?.permissions?.delegation_level === 'manage'
+})
+
+const initialDelegations = ref<Delegation[]>([])
+const localDelegations = ref<Delegation[]>([])
 const loadingDelegations = ref(false)
+const saving = ref(false)
 const delegatesFilter = ref('')
 const memberSearchQuery = ref('')
 const memberLevels = ref<Record<string, 'manage' | 'moderate'>>({})
-const assigningUid = ref<string | null>(null)
-const updatingUid = ref<string | null>(null)
 
 watch(
 	() => props.show,
@@ -182,18 +223,19 @@ watch(
 
 function initMemberLevels() {
 	if (!props.group) return
+	const defaultLevel = isManagerOnly.value ? 'moderate' : 'manage'
 	const map: Record<string, 'manage' | 'moderate'> = {}
 	for (const m of props.group.members) {
-		const existingDel = delegations.value.find((d) => d.user_id === m.uid)
-		map[m.uid] = existingDel ? existingDel.level : 'manage'
+		const existingDel = localDelegations.value.find((d) => d.user_id === m.uid)
+		map[m.uid] = existingDel ? existingDel.level : defaultLevel
 	}
 	memberLevels.value = map
 }
 
 const filteredDelegations = computed(() => {
 	const query = delegatesFilter.value.trim().toLowerCase()
-	if (!query) return delegations.value
-	return delegations.value.filter((d) => {
+	if (!query) return localDelegations.value
+	return localDelegations.value.filter((d) => {
 		const nameMatch = d.displayName.toLowerCase().includes(query)
 		const uidMatch = d.user_id.toLowerCase().includes(query)
 		const emailMatch = d.email ? d.email.toLowerCase().includes(query) : false
@@ -204,7 +246,7 @@ const filteredDelegations = computed(() => {
 const filteredMembers = computed(() => {
 	if (!props.group) return []
 	const ownerId = props.group.owner_id || props.group.creator_id
-	const delegatedUids = new Set(delegations.value.map((d) => d.user_id))
+	const delegatedUids = new Set(localDelegations.value.map((d) => d.user_id))
 	// Exclude owner and any member who already has delegated rights
 	const members = props.group.members.filter((m) => m.uid !== ownerId && !delegatedUids.has(m.uid))
 	const query = memberSearchQuery.value.trim().toLowerCase()
@@ -217,13 +259,40 @@ const filteredMembers = computed(() => {
 	})
 })
 
+const hasChanges = computed(() => {
+	if (loadingDelegations.value) return false
+
+	const initialMap = new Map<string, 'manage' | 'moderate'>()
+	for (const d of initialDelegations.value) {
+		initialMap.set(d.user_id, d.level)
+	}
+
+	const localMap = new Map<string, 'manage' | 'moderate'>()
+	for (const d of localDelegations.value) {
+		localMap.set(d.user_id, d.level)
+	}
+
+	if (initialMap.size !== localMap.size) {
+		return true
+	}
+
+	for (const [uid, level] of localMap.entries()) {
+		if (!initialMap.has(uid) || initialMap.get(uid) !== level) {
+			return true
+		}
+	}
+
+	return false
+})
+
 async function fetchDelegations() {
 	loadingDelegations.value = true
 	try {
 		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.delegations)) {
-			delegations.value = response.data.delegations
+			initialDelegations.value = response.data.delegations
+			localDelegations.value = JSON.parse(JSON.stringify(response.data.delegations))
 			initMemberLevels()
 		}
 	} catch (err: unknown) {
@@ -233,84 +302,98 @@ async function fetchDelegations() {
 	}
 }
 
-async function onLevelChange(userId: string, newLevel: string) {
+function onLevelChange(userId: string, newLevel: string) {
 	if (newLevel !== 'manage' && newLevel !== 'moderate') return
-	updatingUid.value = userId
-	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
-		const response = await axios.post(url, {
-			userId,
-			level: newLevel,
-		})
-		const idx = delegations.value.findIndex((d) => d.user_id === userId)
-		if (idx !== -1) {
-			delegations.value[idx] = response.data
-		}
-		if (memberLevels.value[userId]) {
-			memberLevels.value[userId] = newLevel as 'manage' | 'moderate'
-		}
-		showSuccess('Уровень прав обновлен')
-		emit('updated')
-	} catch (err: unknown) {
-		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка обновления уровня'
-		showError(msg)
-		fetchDelegations()
-	} finally {
-		updatingUid.value = null
+	const target = localDelegations.value.find((d) => d.user_id === userId)
+	if (target) {
+		target.level = newLevel as 'manage' | 'moderate'
 	}
 }
 
-async function revoke(userId: string) {
-	updatingUid.value = userId
-	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations/${userId}`)
-		await axios.delete(url)
-		delegations.value = delegations.value.filter((d) => d.user_id !== userId)
-		showSuccess('Делегирование прав успешно отозвано')
-		emit('updated')
-	} catch (err: unknown) {
-		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при отзыве прав'
-		showError(msg)
-	} finally {
-		updatingUid.value = null
-	}
+function revoke(userId: string) {
+	localDelegations.value = localDelegations.value.filter((d) => d.user_id !== userId)
 }
 
-async function assignRights(uid: string) {
-	if (delegations.value.some((d) => d.user_id === uid)) {
+function assignRights(member: UserOption) {
+	if (localDelegations.value.some((d) => d.user_id === member.uid)) {
 		return
 	}
-	const level = memberLevels.value[uid] || 'manage'
-	assigningUid.value = uid
-	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
-		const response = await axios.post(url, {
-			userId: uid,
-			level,
-		})
-		const idx = delegations.value.findIndex((d) => d.user_id === uid)
-		if (idx !== -1) {
-			delegations.value[idx] = response.data
-		} else {
-			delegations.value.push(response.data)
+	const level = isManagerOnly.value ? 'moderate' : (memberLevels.value[member.uid] || 'manage')
+	localDelegations.value.push({
+		id: 0,
+		group_id: props.group.group_id,
+		user_id: member.uid,
+		displayName: member.displayName,
+		email: member.email || '',
+		level,
+		created_at: '',
+	})
+}
+
+async function saveChanges() {
+	// Diff initialDelegations and localDelegations
+	const initialMap = new Map<string, 'manage' | 'moderate'>()
+	for (const d of initialDelegations.value) {
+		initialMap.set(d.user_id, d.level)
+	}
+
+	const localMap = new Map<string, 'manage' | 'moderate'>()
+	for (const d of localDelegations.value) {
+		localMap.set(d.user_id, d.level)
+	}
+
+	const toRevoke: string[] = []
+	for (const [uid] of initialMap.entries()) {
+		if (!localMap.has(uid)) {
+			toRevoke.push(uid)
 		}
-		showSuccess('Права успешно делегированы')
+	}
+
+	const toSave: Array<{ userId: string; level: 'manage' | 'moderate' }> = []
+	for (const [uid, level] of localMap.entries()) {
+		const initialLevel = initialMap.get(uid)
+		if (!initialLevel || initialLevel !== level) {
+			toSave.push({ userId: uid, level })
+		}
+	}
+
+	if (toRevoke.length === 0 && toSave.length === 0) {
+		emit('close')
+		return
+	}
+
+	saving.value = true
+	try {
+		const promises = []
+		for (const uid of toRevoke) {
+			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations/${uid}`)
+			promises.push(axios.delete(url))
+		}
+		for (const item of toSave) {
+			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
+			promises.push(axios.post(url, {
+				userId: item.userId,
+				level: item.level,
+			}))
+		}
+
+		await Promise.all(promises)
+		showSuccess('Изменения успешно сохранены')
 		emit('updated')
+		emit('close')
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при назначении прав'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при сохранении изменений'
 		showError(msg)
 	} finally {
-		assigningUid.value = null
+		saving.value = false
 	}
 }
 </script>
 
 <style scoped>
 .delegation-modal-content {
-	padding: 16px 20px;
+	padding: 20px;
 	display: flex;
 	flex-direction: column;
 	gap: 16px;
@@ -401,6 +484,25 @@ async function assignRights(uid: string) {
 	font-size: 13px;
 }
 
+.static-level-chip {
+	font-size: 12px;
+	padding: 4px 10px;
+	border-radius: 5px;
+	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+}
+
+.static-level-chip.manage-chip {
+	background-color: var(--color-warning-element-light, #fff2d6);
+	color: inherit;
+}
+
+.static-level-chip.moderate-chip {
+	background-color: var(--color-primary-element-light);
+	color: inherit;
+}
+
 .divider {
 	height: 1px;
 	background-color: var(--color-border);
@@ -457,8 +559,9 @@ async function assignRights(uid: string) {
 .modal-actions {
 	display: flex;
 	justify-content: flex-end;
+	gap: 12px;
 	margin-top: 8px;
-	padding-top: 12px;
+	padding-top: 16px;
 	border-top: 1px solid var(--color-border);
 }
 </style>
