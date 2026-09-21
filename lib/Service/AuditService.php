@@ -186,5 +186,17 @@ class AuditService {
 			]
 		);
 	}
+
+	public function auditGroupShareRevoked(string $groupId, string $groupName, string $itemName, string $actorId): void {
+		$this->logAction(
+			'Share for item "%s" revoked from custom group "%s" (%s) by %s',
+			[
+				'item_name' => $itemName,
+				'group_name' => $groupName,
+				'group_id' => $groupId,
+				'actor' => $actorId,
+			]
+		);
+	}
 }
 

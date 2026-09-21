@@ -30,13 +30,16 @@
 				<label for="group-owner" class="form-label">
 					Передать владение группой
 				</label>
+				<div class="current-owner-info">
+					Текущий владелец: <strong>{{ currentOwnerDisplayName }}</strong> <span v-if="currentOwnerEmail">({{ currentOwnerEmail }})</span>
+				</div>
 				<select
 					id="group-owner"
 					v-model="selectedNewOwnerId"
 					class="owner-select"
 					:disabled="loading">
 					<option value="">
-						— Не менять (текущий владелец: {{ currentOwnerDisplayName }}) —
+						-- Без изменений --
 					</option>
 					<option
 						v-for="user in selectedUsers"
@@ -189,6 +192,11 @@ const currentOwnerDisplayName = computed(() => {
 	return props.group.owner_displayName || props.group.creator_displayName || currentOwnerUid.value
 })
 
+const currentOwnerEmail = computed(() => {
+	if (!props.group) return ''
+	return props.group.owner_email || props.group.creator_email || ''
+})
+
 const name = ref('')
 const selectedNewOwnerId = ref<string>('')
 const selectedUsers = ref<UserOption[]>([])
@@ -333,6 +341,12 @@ async function submitForm() {
 	font-weight: 600;
 	font-size: 14px;
 	color: var(--color-main-text);
+}
+
+.current-owner-info {
+	font-size: 13px;
+	color: var(--color-text-maxcontrast);
+	margin-bottom: 2px;
 }
 
 .required {

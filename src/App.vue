@@ -108,6 +108,12 @@
 
 					<div v-if="hasGroupActions" class="group-header-actions">
 						<NcButton
+							v-if="selectedGroup.permissions?.can_manage_shares"
+							type="tertiary"
+							@click="showSharesModal = true">
+							Общие ресурсы
+						</NcButton>
+						<NcButton
 							v-if="selectedGroup.permissions?.can_view_history"
 							type="tertiary"
 							@click="showActivityModal = true">
@@ -117,7 +123,7 @@
 							v-if="selectedGroup.permissions?.can_delegate"
 							type="tertiary"
 							@click="openDelegationModal">
-							Права управления
+							Делегирование
 						</NcButton>
 						<NcButton
 							v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
@@ -380,6 +386,14 @@
 			:group="selectedGroup"
 			@close="showActivityModal = false" />
 
+		<!-- Group Shares Modal -->
+		<GroupSharesModal
+			v-if="selectedGroup"
+			:show="showSharesModal"
+			:group="selectedGroup"
+			@close="showSharesModal = false"
+			@unshared="onResourceUnshared" />
+
 		<!-- Delete Confirm Modal -->
 		<ConfirmModal
 			:show="showDeleteModal"
@@ -411,6 +425,7 @@ import DelegationModal from './components/DelegationModal.vue'
 import RequestMemberModal from './components/RequestMemberModal.vue'
 import RequestHistoryModal from './components/RequestHistoryModal.vue'
 import GroupActivityModal from './components/GroupActivityModal.vue'
+import GroupSharesModal from './components/GroupSharesModal.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
 import type { AppState, CustomGroup, MembershipRequest } from './types'
 
@@ -443,6 +458,7 @@ const showDelegationModal = ref(false)
 const showRequestModal = ref(false)
 const showHistoryModal = ref(false)
 const showActivityModal = ref(false)
+const showSharesModal = ref(false)
 const showDeleteModal = ref(false)
 const groupToDelete = ref<CustomGroup | null>(null)
 const deleting = ref(false)
@@ -454,8 +470,11 @@ const processingRequestId = ref<number | null>(null)
 
 onMounted(async () => {
 	await reloadGroups()
-	if (selectedGroupId.value && selectedGroup.value?.permissions?.can_moderate_requests) {
-		await fetchGroupRequests()
+	if (selectedGroupId.value) {
+		await refreshGroupData(selectedGroupId.value)
+		if (selectedGroup.value?.permissions?.can_moderate_requests) {
+			await fetchGroupRequests()
+		}
 	}
 })
 
@@ -507,7 +526,7 @@ const hasDelegates = computed(() => {
 
 const hasGroupActions = computed(() => {
 	const p = selectedGroup.value?.permissions
-	return Boolean(p?.can_view_history || p?.can_delegate || p?.can_edit_members || p?.can_edit_name || p?.can_delete)
+	return Boolean(p?.can_manage_shares || p?.can_view_history || p?.can_delegate || p?.can_edit_members || p?.can_edit_name || p?.can_delete)
 })
 
 const pendingRequestsCount = computed(() => {
@@ -558,9 +577,34 @@ function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
 	return del ? del.level : null
 }
 
-function selectGroup(groupId: string) {
+async function refreshGroupData(groupId: string) {
+	try {
+		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${groupId}`)
+		const response = await axios.get(url)
+		if (response.data && response.data.group) {
+			const updated = response.data.group as CustomGroup
+			const idx = allGroups.value.findIndex((g) => g.group_id === groupId)
+			if (idx !== -1) {
+				allGroups.value[idx] = updated
+			} else {
+				allGroups.value.push(updated)
+			}
+		}
+	} catch (err) {
+		console.error('Failed to refresh group details:', err)
+	}
+}
+
+async function onResourceUnshared() {
+	if (selectedGroupId.value) {
+		await refreshGroupData(selectedGroupId.value)
+	}
+}
+
+async function selectGroup(groupId: string) {
 	selectedGroupId.value = groupId
 	memberSearchQuery.value = ''
+	await refreshGroupData(groupId)
 	if (selectedGroup.value?.permissions?.can_moderate_requests) {
 		fetchGroupRequests()
 	}
@@ -958,8 +1002,7 @@ async function reloadGroups() {
 }
 
 .pending-badge {
-	background-color: var(--color-error);
-	color: #fff;
+	background-color: var(--color-primary-element-light);
 	font-size: 11px;
 	font-weight: bold;
 	padding: 1px 7px;

@@ -524,5 +524,59 @@ class CustomGroupMapper extends QBMapper {
 
 		return true;
 	}
+
+	/**
+	 * Returns list of shares shared with this custom user group
+	 *
+	 * @param string $groupId
+	 * @return array<int, array{id: int, item_type: string, file_source: int, file_target: string, permissions: int, stime: int, uid_owner: string, uid_initiator: string, file_name: ?string, file_path: ?string, file_mimetype: ?string, file_size: ?int}>
+	 */
+	public function getGroupShares(string $groupId): array {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select(
+			's.id',
+			's.item_type',
+			's.file_source',
+			's.file_target',
+			's.permissions',
+			's.stime',
+			's.uid_owner',
+			's.uid_initiator',
+			'f.name as file_name',
+			'f.path as file_path',
+			'f.mimetype as file_mimetype',
+			'f.size as file_size'
+		)
+			->from('share', 's')
+			->leftJoin('s', 'filecache', 'f', $qb->expr()->eq('s.file_source', 'f.fileid'))
+			->where($qb->expr()->eq('s.share_type', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('s.share_with', $qb->createNamedParameter($groupId)))
+			->orderBy('s.stime', 'DESC')
+			->addOrderBy('s.id', 'DESC');
+
+		$result = $qb->executeQuery();
+		$rows = $result->fetchAllAssociative();
+		$result->closeCursor();
+
+		$shares = [];
+		foreach ($rows as $row) {
+			$shares[] = [
+				'id' => (int)$row['id'],
+				'item_type' => (string)$row['item_type'],
+				'file_source' => (int)$row['file_source'],
+				'file_target' => (string)($row['file_target'] ?? ''),
+				'permissions' => (int)$row['permissions'],
+				'stime' => (int)$row['stime'],
+				'uid_owner' => (string)($row['uid_owner'] ?? ''),
+				'uid_initiator' => (string)($row['uid_initiator'] ?? ''),
+				'file_name' => isset($row['file_name']) ? (string)$row['file_name'] : null,
+				'file_path' => isset($row['file_path']) ? (string)$row['file_path'] : null,
+				'file_mimetype' => isset($row['file_mimetype']) ? (string)$row['file_mimetype'] : null,
+				'file_size' => isset($row['file_size']) ? (int)$row['file_size'] : null,
+			];
+		}
+
+		return $shares;
+	}
 }
 

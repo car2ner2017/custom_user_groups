@@ -154,6 +154,14 @@ class CustomGroupActivityMapper extends QBMapper {
 					? "Владение группой передано участнику $targetName"
 					: 'Передано владение группой';
 
+			case CustomGroupActivity::ACTION_SHARE_UNSHARE:
+				$name = $details['name'] ?? '';
+				$itemType = ($details['item_type'] ?? '') === 'folder' ? 'папке' : 'файлу';
+				if ($name !== '') {
+					return "Отозван общий доступ к {$itemType} «{$name}» для группы";
+				}
+				return 'Отозван общий доступ к ресурсу для группы';
+
 			default:
 				return 'Действие с группой';
 		}

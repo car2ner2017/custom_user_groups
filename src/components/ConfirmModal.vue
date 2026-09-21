@@ -19,7 +19,7 @@
 					type="error"
 					:disabled="loading"
 					@click="$emit('confirm')">
-					Удалить
+					{{ confirmText || 'Удалить' }}
 				</NcButton>
 			</div>
 		</div>
@@ -34,6 +34,7 @@ defineProps<{
 	show: boolean
 	title: string
 	message: string
+	confirmText?: string
 	loading?: boolean
 }>()
 

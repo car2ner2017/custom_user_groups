@@ -184,7 +184,7 @@ const countDelegations = computed(() => {
 })
 
 const countSettings = computed(() => {
-	return activities.value.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer').length
+	return activities.value.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer' || a.action_type === 'share_unshare').length
 })
 
 const filteredActivities = computed(() => {
@@ -194,7 +194,7 @@ const filteredActivities = computed(() => {
 	} else if (categoryFilter.value === 'delegations') {
 		list = list.filter((a) => a.action_type === 'delegation_assign' || a.action_type === 'delegation_revoke')
 	} else if (categoryFilter.value === 'settings') {
-		list = list.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer')
+		list = list.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer' || a.action_type === 'share_unshare')
 	}
 
 	const query = searchFilter.value.trim().toLowerCase()
@@ -224,6 +224,8 @@ function getActionLabel(type: string): string {
 		return 'Переименование группы'
 	case 'owner_transfer':
 		return 'Передача владения'
+	case 'share_unshare':
+		return 'Отзыв доступа к ресурсу'
 	default:
 		return 'Действие'
 	}
@@ -350,6 +352,10 @@ function formatDate(dateStr?: string | null): string {
 	border-left: 4px solid var(--color-primary-element);
 }
 
+.activity-card.type-share_unshare {
+	border-left: 4px solid var(--color-error);
+}
+
 .card-header {
 	display: flex;
 	justify-content: space-between;
@@ -380,6 +386,10 @@ function formatDate(dateStr?: string | null): string {
 .tag-name_change,
 .tag-owner_transfer {
 	background-color: var(--color-primary-element-light);
+}
+
+.tag-share_unshare {
+	background-color: rgba(224, 76, 56, 0.15);
 }
 
 .card-date {

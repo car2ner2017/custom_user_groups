@@ -30,6 +30,8 @@ use OCP\IGroupManager;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserManager;
+use OCP\Share\IManager;
+use OCP\Share\IShare;
 
 class GroupApiController extends Controller {
 
@@ -45,6 +47,7 @@ class GroupApiController extends Controller {
 		private IUserManager $userManager,
 		private IGroupManager $groupManager,
 		private IEventDispatcher $eventDispatcher,
+		private IManager $shareManager,
 		private ?string $userId,
 	) {
 		parent::__construct($appName, $request);
@@ -866,6 +869,163 @@ class GroupApiController extends Controller {
 
 		$activities = $this->activityMapper->getActivities($groupId, 200);
 		return new JSONResponse(['activities' => $activities]);
+	}
+
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups/{groupId}')]
+	public function getGroup(string $groupId): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$currentUid = (string)$this->userId;
+		$isAdmin = $this->groupManager->isAdmin($currentUid);
+
+		$group = $this->mapper->getGroupDetails($groupId);
+		if ($group === null) {
+			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+		}
+
+		$ownerId = $group['owner_id'] ?? $group['creator_id'];
+		$isMember = $this->mapper->isMember($groupId, $currentUid);
+		$isOwner = ($ownerId === $currentUid);
+
+		if (!$isAdmin && !$isOwner && !$isMember) {
+			return new JSONResponse(['error' => 'Доступ запрещен'], Http::STATUS_FORBIDDEN);
+		}
+
+		return new JSONResponse(['group' => $this->enrichGroup($group, $isAdmin)]);
+	}
+
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'GET', url: '/api/v1/groups/{groupId}/shares')]
+	public function getGroupShares(string $groupId): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$group = $this->mapper->getGroupDetails($groupId);
+		if ($group === null) {
+			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+		}
+
+		$currentUid = (string)$this->userId;
+		if (!$this->canManageGroupShares($group, $currentUid)) {
+			return new JSONResponse(
+				['error' => 'Просмотр ресурсов группы доступен только владельцу группы, управляющему или администратору'],
+				Http::STATUS_FORBIDDEN
+			);
+		}
+
+		$rawShares = $this->mapper->getGroupShares($groupId);
+		$shares = [];
+		foreach ($rawShares as $s) {
+			$ownerUser = $this->userManager->get($s['uid_owner']);
+			$ownerDisplayName = $ownerUser instanceof IUser ? $ownerUser->getDisplayName() : $s['uid_owner'];
+			$ownerEmail = $ownerUser instanceof IUser ? ($ownerUser->getEMailAddress() ?: '') : '';
+
+			$initiatorUser = $this->userManager->get($s['uid_initiator']);
+			$initiatorDisplayName = $initiatorUser instanceof IUser ? $initiatorUser->getDisplayName() : $s['uid_initiator'];
+			$initiatorEmail = $initiatorUser instanceof IUser ? ($initiatorUser->getEMailAddress() ?: '') : '';
+
+			$cleanPath = $s['file_path'] ?? $s['file_target'];
+			if ($cleanPath !== null && str_starts_with($cleanPath, 'files/')) {
+				$cleanPath = substr($cleanPath, 6);
+			}
+
+			$name = $s['file_name'] ?: basename($s['file_target'] ?: 'Ресурс');
+
+			$shares[] = [
+				'id' => $s['id'],
+				'item_type' => $s['item_type'],
+				'name' => $name,
+				'path' => $cleanPath ?: $name,
+				'file_source' => $s['file_source'],
+				'permissions' => $s['permissions'],
+				'stime' => $s['stime'],
+				'created_at' => (new DateTime())->setTimestamp($s['stime'])->format(DateTime::ATOM),
+				'uid_owner' => $s['uid_owner'],
+				'owner_displayName' => $ownerDisplayName,
+				'owner_email' => $ownerEmail,
+				'uid_initiator' => $s['uid_initiator'],
+				'initiator_displayName' => $initiatorDisplayName,
+				'initiator_email' => $initiatorEmail,
+			];
+		}
+
+		return new JSONResponse(['shares' => $shares]);
+	}
+
+	#[NoAdminRequired]
+	#[FrontpageRoute(verb: 'DELETE', url: '/api/v1/groups/{groupId}/shares/{shareId}')]
+	public function unshareGroupShare(string $groupId, int $shareId): JSONResponse {
+		if ($err = $this->checkAccess()) {
+			return $err;
+		}
+
+		$group = $this->mapper->getGroupDetails($groupId);
+		if ($group === null) {
+			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+		}
+
+		$currentUid = (string)$this->userId;
+		if (!$this->canManageGroupShares($group, $currentUid)) {
+			return new JSONResponse(
+				['error' => 'Отзыв доступа к ресурсу доступен только владельцу группы, управляющему или администратору'],
+				Http::STATUS_FORBIDDEN
+			);
+		}
+
+		try {
+			$share = $this->shareManager->getShareById((string)$shareId);
+		} catch (Exception) {
+			return new JSONResponse(['error' => 'Ресурс общего доступа не найден'], Http::STATUS_NOT_FOUND);
+		}
+
+		if ($share->getShareType() !== IShare::TYPE_GROUP || $share->getSharedWith() !== $groupId) {
+			return new JSONResponse(['error' => 'Указанный ресурс не связан с данной группой'], Http::STATUS_BAD_REQUEST);
+		}
+
+		$nodeName = '';
+		$itemType = $share->getNodeType();
+		try {
+			$node = $share->getNode();
+			$nodeName = $node ? $node->getName() : '';
+		} catch (Exception) {
+			$nodeName = $share->getTarget() ?: 'ресурс';
+		}
+		if ($nodeName === '') {
+			$nodeName = $share->getTarget() ?: 'ресурс';
+		}
+
+		$ownerId = $share->getShareOwner();
+		$initiatorId = $share->getSharedBy();
+
+		try {
+			$this->shareManager->deleteShare($share);
+		} catch (Exception $e) {
+			return new JSONResponse(['error' => 'Не удалось отозвать доступ: ' . $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+		}
+
+		// Log activity in group audit trail
+		$this->activityMapper->logActivity(
+			$groupId,
+			CustomGroupActivity::ACTION_SHARE_UNSHARE,
+			$currentUid,
+			null,
+			[
+				'share_id' => $shareId,
+				'item_type' => $itemType,
+				'name' => $nodeName,
+				'owner' => $ownerId,
+				'initiator' => $initiatorId,
+			]
+		);
+
+		// Log in Nextcloud system audit
+		$this->auditService->auditGroupShareRevoked($groupId, $group['name'], $nodeName, $currentUid);
+
+		return new JSONResponse(['success' => true]);
 	}
 
 	// ==========================================

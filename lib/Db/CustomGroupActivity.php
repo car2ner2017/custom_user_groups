@@ -30,6 +30,7 @@ class CustomGroupActivity extends Entity implements JsonSerializable {
 	public const ACTION_DELEGATION_REVOKE = 'delegation_revoke';
 	public const ACTION_NAME_CHANGE = 'name_change';
 	public const ACTION_OWNER_TRANSFER = 'owner_transfer';
+	public const ACTION_SHARE_UNSHARE = 'share_unshare';
 
 	protected ?string $groupId = null;
 	protected ?string $actionType = null;

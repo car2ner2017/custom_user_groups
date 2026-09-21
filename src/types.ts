@@ -46,6 +46,7 @@ export interface GroupPermissions {
 	can_request_member: boolean
 	can_transfer_ownership?: boolean
 	can_view_history?: boolean
+	can_manage_shares?: boolean
 	delegation_level: 'manage' | 'moderate' | null
 }
 
@@ -72,6 +73,23 @@ export interface CustomGroup {
 	permissions: GroupPermissions
 }
 
+export interface GroupShare {
+	id: number
+	item_type: 'file' | 'folder'
+	name: string
+	path: string
+	file_source: number
+	permissions: number
+	stime: number
+	created_at: string
+	uid_owner: string
+	owner_displayName: string
+	owner_email?: string
+	uid_initiator: string
+	initiator_displayName: string
+	initiator_email?: string
+}
+
 export interface GroupActivityDetails {
 	old_name?: string
 	new_name?: string
@@ -84,7 +102,7 @@ export interface GroupActivityDetails {
 export interface GroupActivity {
 	id: number
 	group_id: string
-	action_type: 'member_add' | 'member_remove' | 'delegation_assign' | 'delegation_revoke' | 'name_change' | 'owner_transfer'
+	action_type: 'member_add' | 'member_remove' | 'delegation_assign' | 'delegation_revoke' | 'name_change' | 'owner_transfer' | 'share_unshare'
 	actor_id: string
 	actor_displayName: string
 	actor_email: string
