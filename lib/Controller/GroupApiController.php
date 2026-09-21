@@ -817,22 +817,68 @@ class GroupApiController extends Controller {
 			return $res;
 		};
 
-		return new JSONResponse([
+		$response = new JSONResponse([
 			'settings' => $rawSettings,
 			'create_allowed_users_details' => $enrichUsers($rawSettings['create_allowed_users']),
 			'create_allowed_groups_details' => $enrichGroups($rawSettings['create_allowed_groups']),
+			'access_allowed_users_details' => $enrichUsers($rawSettings['access_allowed_users'] ?? []),
+			'access_allowed_groups_details' => $enrichGroups($rawSettings['access_allowed_groups'] ?? []),
 			'access_forbidden_users_details' => $enrichUsers($rawSettings['access_forbidden_users']),
 			'access_forbidden_groups_details' => $enrichGroups($rawSettings['access_forbidden_groups']),
 		]);
+		$response->addHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+		$response->addHeader('Pragma', 'no-cache');
+		$response->addHeader('Expires', '0');
+		return $response;
 	}
 
 	#[FrontpageRoute(verb: 'POST', url: '/api/v1/admin/settings')]
-	public function saveAdminSettings(): JSONResponse {
+	public function saveAdminSettings(
+		bool $create_restriction_enabled = false,
+		array $create_allowed_users = [],
+		array $create_allowed_groups = [],
+		bool $access_restriction_enabled = false,
+		array $access_allowed_users = [],
+		array $access_allowed_groups = [],
+		array $access_forbidden_users = [],
+		array $access_forbidden_groups = []
+	): JSONResponse {
 		if ($err = $this->checkAdmin()) {
 			return $err;
 		}
 
-		$params = $this->request->getParams();
+		$params = [
+			'create_restriction_enabled' => $create_restriction_enabled,
+			'create_allowed_users' => $create_allowed_users,
+			'create_allowed_groups' => $create_allowed_groups,
+			'access_restriction_enabled' => $access_restriction_enabled,
+			'access_allowed_users' => $access_allowed_users,
+			'access_allowed_groups' => $access_allowed_groups,
+			'access_forbidden_users' => $access_forbidden_users,
+			'access_forbidden_groups' => $access_forbidden_groups,
+		];
+
+		$rawInput = file_get_contents('php://input');
+		if ($rawInput !== '' && $rawInput !== false) {
+			$jsonInput = json_decode($rawInput, true);
+			if (is_array($jsonInput)) {
+				foreach ($params as $k => $v) {
+					if (array_key_exists($k, $jsonInput)) {
+						$params[$k] = $jsonInput[$k];
+					}
+				}
+			}
+		}
+
+		$requestParams = $this->request->getParams();
+		if (is_array($requestParams)) {
+			foreach ($params as $k => $v) {
+				if (array_key_exists($k, $requestParams)) {
+					$params[$k] = $requestParams[$k];
+				}
+			}
+		}
+
 		$this->settingsService->saveSettings($params);
 
 		return $this->getAdminSettings();

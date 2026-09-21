@@ -144,17 +144,139 @@
 		<!-- Section 2: App Access Restriction -->
 		<NcSettingsSection
 			name="Ограничение доступа к приложению"
-			description="Настройте список пользователей и групп, которым запрещен доступ к веб-интерфейсу «Пользовательские группы».">
+			description="Настройте правила доступа пользователей и групп к веб-интерфейсу «Пользовательские группы».">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
 					v-model="accessRestrictionEnabled"
 					type="switch">
-					Ограничить доступ к приложению (запретить определенным пользователям и группам)
+					Ограничить доступ к приложению
 				</NcCheckboxRadioSwitch>
 
 				<div v-if="accessRestrictionEnabled" class="restriction-details">
 					<div class="info-callout">
-						<strong>Примечание:</strong> Пользователи с запретом доступа не видят приложение в верхнем меню навигации и получают отказ при попытке прямого перехода. При этом они остаются полноценными участниками существующих групп и могут получать общий доступ к файлам и папкам.
+						<strong>Примечание:</strong> Правила доступа применяются сверху вниз: если пользователю разрешено использовать приложение напрямую или через разрешенную группу, ему всегда предоставляется доступ (даже если он входит в запрещенную группу или указан в списке запрещенных). Администраторам доступ разрешен всегда.
+					</div>
+
+					<!-- Allowed Users Selection -->
+					<div class="picker-group">
+						<label class="picker-label">Разрешенные пользователи ({{ accessAllowedUsers.length }})</label>
+
+						<!-- Selected allowed users list -->
+						<div v-if="accessAllowedUsersDetails.length > 0" class="selected-items-list">
+							<div
+								v-for="user in accessAllowedUsersDetails"
+								:key="user.uid"
+								class="selected-item">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeAccessAllowedUser(user.uid)">
+									- Удалить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							Пользователи пока не добавлены
+						</div>
+
+						<!-- Search users for access allow -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="userSearchAccessAllowed"
+								placeholder="Поиск пользователей для разрешения доступа..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available users to allow -->
+						<div v-if="filteredAvailableAccessAllowedUsers.length > 0" class="available-items-list">
+							<div
+								v-for="user in filteredAvailableAccessAllowedUsers"
+								:key="user.uid"
+								class="available-item"
+								@click="addAccessAllowedUser(user)">
+								<div class="item-info">
+									<span class="item-primary">{{ user.displayName }}</span>
+									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addAccessAllowedUser(user)">
+									+ Разрешить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ userSearchAccessAllowed.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
+						</div>
+					</div>
+
+					<!-- Allowed Groups Selection -->
+					<div class="picker-group">
+						<label class="picker-label">Разрешенные группы ({{ accessAllowedGroups.length }})</label>
+
+						<!-- Selected allowed groups list -->
+						<div v-if="accessAllowedGroupsDetails.length > 0" class="selected-items-list">
+							<div
+								v-for="grp in accessAllowedGroupsDetails"
+								:key="grp.id"
+								class="selected-item">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="error"
+									size="small"
+									:disabled="saving"
+									@click.stop="removeAccessAllowedGroup(grp.id)">
+									- Удалить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							Группы пока не добавлены
+						</div>
+
+						<!-- Search groups for access allow -->
+						<div class="search-input-wrapper">
+							<NcTextField
+								v-model="groupSearchAccessAllowed"
+								placeholder="Поиск групп для разрешения доступа..."
+								:disabled="saving" />
+						</div>
+
+						<!-- Available groups to allow -->
+						<div v-if="filteredAvailableAccessAllowedGroups.length > 0" class="available-items-list">
+							<div
+								v-for="grp in filteredAvailableAccessAllowedGroups"
+								:key="grp.id"
+								class="available-item"
+								@click="addAccessAllowedGroup(grp)">
+								<div class="item-info">
+									<span class="item-primary">{{ grp.name }}</span>
+									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-else class="item-secondary">({{ grp.id }})</span>
+								</div>
+								<NcButton
+									type="tertiary"
+									size="small"
+									:disabled="saving"
+									@click.stop="addAccessAllowedGroup(grp)">
+									+ Разрешить
+								</NcButton>
+							</div>
+						</div>
+						<div v-else class="empty-hint">
+							{{ groupSearchAccessAllowed.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
+						</div>
 					</div>
 
 					<!-- Forbidden Users Selection -->
@@ -175,7 +297,7 @@
 									type="error"
 									size="small"
 									:disabled="saving"
-									@click.stop="removeAccessUser(user.uid)">
+									@click.stop="removeAccessForbiddenUser(user.uid)">
 									- Удалить
 								</NcButton>
 							</div>
@@ -187,18 +309,18 @@
 						<!-- Search users for access restriction -->
 						<div class="search-input-wrapper">
 							<NcTextField
-								v-model="userSearchAccess"
+								v-model="userSearchAccessForbidden"
 								placeholder="Поиск пользователей для ограничения доступа..."
 								:disabled="saving" />
 						</div>
 
 						<!-- Available users to forbid -->
-						<div v-if="filteredAvailableAccessUsers.length > 0" class="available-items-list">
+						<div v-if="filteredAvailableAccessForbiddenUsers.length > 0" class="available-items-list">
 							<div
-								v-for="user in filteredAvailableAccessUsers"
+								v-for="user in filteredAvailableAccessForbiddenUsers"
 								:key="user.uid"
 								class="available-item"
-								@click="addAccessUser(user)">
+								@click="addAccessForbiddenUser(user)">
 								<div class="item-info">
 									<span class="item-primary">{{ user.displayName }}</span>
 									<span class="item-secondary">{{ user.email || ('@' + user.uid) }}</span>
@@ -207,13 +329,13 @@
 									type="tertiary"
 									size="small"
 									:disabled="saving"
-									@click.stop="addAccessUser(user)">
+									@click.stop="addAccessForbiddenUser(user)">
 									+ Запретить
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ userSearchAccess.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
+							{{ userSearchAccessForbidden.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
 						</div>
 					</div>
 
@@ -236,7 +358,7 @@
 									type="error"
 									size="small"
 									:disabled="saving"
-									@click.stop="removeAccessGroup(grp.id)">
+									@click.stop="removeAccessForbiddenGroup(grp.id)">
 									- Удалить
 								</NcButton>
 							</div>
@@ -248,18 +370,18 @@
 						<!-- Search groups for access restriction -->
 						<div class="search-input-wrapper">
 							<NcTextField
-								v-model="groupSearchAccess"
+								v-model="groupSearchAccessForbidden"
 								placeholder="Поиск групп для ограничения доступа..."
 								:disabled="saving" />
 						</div>
 
 						<!-- Available groups to forbid -->
-						<div v-if="filteredAvailableAccessGroups.length > 0" class="available-items-list">
+						<div v-if="filteredAvailableAccessForbiddenGroups.length > 0" class="available-items-list">
 							<div
-								v-for="grp in filteredAvailableAccessGroups"
+								v-for="grp in filteredAvailableAccessForbiddenGroups"
 								:key="grp.id"
 								class="available-item"
-								@click="addAccessGroup(grp)">
+								@click="addAccessForbiddenGroup(grp)">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
 									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
@@ -269,13 +391,13 @@
 									type="tertiary"
 									size="small"
 									:disabled="saving"
-									@click.stop="addAccessGroup(grp)">
+									@click.stop="addAccessForbiddenGroup(grp)">
 									+ Запретить
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ groupSearchAccess.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
+							{{ groupSearchAccessForbidden.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
 						</div>
 					</div>
 				</div>
@@ -315,23 +437,31 @@ const defaultSettings: AdminSettingsData = {
 	create_allowed_users: [],
 	create_allowed_groups: [],
 	access_restriction_enabled: false,
+	access_allowed_users: [],
+	access_allowed_groups: [],
 	access_forbidden_users: [],
 	access_forbidden_groups: [],
 }
 
-const initialData = loadState<AdminSettingsData>('customusergroups', 'customUserGroupsSettings', defaultSettings)
+const initialRaw = loadState<any>('customusergroups', 'customUserGroupsSettings', defaultSettings)
+const initialData: AdminSettingsData = initialRaw?.settings || initialRaw || defaultSettings
 
-const createRestrictionEnabled = ref(initialData.create_restriction_enabled)
+const createRestrictionEnabled = ref(initialData.create_restriction_enabled ?? false)
 const createAllowedUsers = ref<string[]>(initialData.create_allowed_users || [])
 const createAllowedGroups = ref<string[]>(initialData.create_allowed_groups || [])
-const createAllowedUsersDetails = ref<UserOption[]>([])
-const createAllowedGroupsDetails = ref<GroupOption[]>([])
+const createAllowedUsersDetails = ref<UserOption[]>(initialRaw?.create_allowed_users_details || [])
+const createAllowedGroupsDetails = ref<GroupOption[]>(initialRaw?.create_allowed_groups_details || [])
 
-const accessRestrictionEnabled = ref(initialData.access_restriction_enabled)
+const accessRestrictionEnabled = ref(initialData.access_restriction_enabled ?? false)
+const accessAllowedUsers = ref<string[]>(initialData.access_allowed_users || [])
+const accessAllowedGroups = ref<string[]>(initialData.access_allowed_groups || [])
+const accessAllowedUsersDetails = ref<UserOption[]>(initialRaw?.access_allowed_users_details || [])
+const accessAllowedGroupsDetails = ref<GroupOption[]>(initialRaw?.access_allowed_groups_details || [])
+
 const accessForbiddenUsers = ref<string[]>(initialData.access_forbidden_users || [])
 const accessForbiddenGroups = ref<string[]>(initialData.access_forbidden_groups || [])
-const accessForbiddenUsersDetails = ref<UserOption[]>([])
-const accessForbiddenGroupsDetails = ref<GroupOption[]>([])
+const accessForbiddenUsersDetails = ref<UserOption[]>(initialRaw?.access_forbidden_users_details || [])
+const accessForbiddenGroupsDetails = ref<GroupOption[]>(initialRaw?.access_forbidden_groups_details || [])
 
 const allSystemUsers = ref<UserOption[]>([])
 const allSystemGroups = ref<GroupOption[]>([])
@@ -340,8 +470,18 @@ const saving = ref(false)
 // Search fields
 const userSearchCreate = ref('')
 const groupSearchCreate = ref('')
-const userSearchAccess = ref('')
-const groupSearchAccess = ref('')
+const userSearchAccessAllowed = ref('')
+const groupSearchAccessAllowed = ref('')
+const userSearchAccessForbidden = ref('')
+const groupSearchAccessForbidden = ref('')
+
+// Pre-merge initial details
+if (createAllowedUsersDetails.value.length > 0) mergeUsers(createAllowedUsersDetails.value)
+if (accessAllowedUsersDetails.value.length > 0) mergeUsers(accessAllowedUsersDetails.value)
+if (accessForbiddenUsersDetails.value.length > 0) mergeUsers(accessForbiddenUsersDetails.value)
+if (createAllowedGroupsDetails.value.length > 0) mergeGroups(createAllowedGroupsDetails.value)
+if (accessAllowedGroupsDetails.value.length > 0) mergeGroups(accessAllowedGroupsDetails.value)
+if (accessForbiddenGroupsDetails.value.length > 0) mergeGroups(accessForbiddenGroupsDetails.value)
 
 onMounted(async () => {
 	await Promise.all([
@@ -371,28 +511,55 @@ function mergeGroups(groups: GroupOption[]) {
 	}
 }
 
+function ensureUserDetails(uids: string[], details: UserOption[]): UserOption[] {
+	const detailMap = new Map((details || []).map((d) => [d.uid, d]))
+	const systemMap = new Map(allSystemUsers.value.map((u) => [u.uid, u]))
+	return uids.map((uid) => detailMap.get(uid) || systemMap.get(uid) || { uid, displayName: uid })
+}
+
+function ensureGroupDetails(gids: string[], details: GroupOption[]): GroupOption[] {
+	const detailMap = new Map((details || []).map((d) => [d.id, d]))
+	const systemMap = new Map(allSystemGroups.value.map((g) => [g.id, g]))
+	return gids.map((gid) => detailMap.get(gid) || systemMap.get(gid) || { id: gid, name: gid, is_cug: gid.startsWith('cug_') })
+}
+
+function applySettingsResponse(data: AdminSettingsResponse) {
+	if (!data || !data.settings) return
+	const s = data.settings
+	createRestrictionEnabled.value = s.create_restriction_enabled ?? false
+	createAllowedUsers.value = s.create_allowed_users || []
+	createAllowedGroups.value = s.create_allowed_groups || []
+	createAllowedUsersDetails.value = ensureUserDetails(createAllowedUsers.value, data.create_allowed_users_details || [])
+	createAllowedGroupsDetails.value = ensureGroupDetails(createAllowedGroups.value, data.create_allowed_groups_details || [])
+
+	accessRestrictionEnabled.value = s.access_restriction_enabled ?? false
+	accessAllowedUsers.value = s.access_allowed_users || []
+	accessAllowedGroups.value = s.access_allowed_groups || []
+	accessAllowedUsersDetails.value = ensureUserDetails(accessAllowedUsers.value, data.access_allowed_users_details || [])
+	accessAllowedGroupsDetails.value = ensureGroupDetails(accessAllowedGroups.value, data.access_allowed_groups_details || [])
+
+	accessForbiddenUsers.value = s.access_forbidden_users || []
+	accessForbiddenGroups.value = s.access_forbidden_groups || []
+	accessForbiddenUsersDetails.value = ensureUserDetails(accessForbiddenUsers.value, data.access_forbidden_users_details || [])
+	accessForbiddenGroupsDetails.value = ensureGroupDetails(accessForbiddenGroups.value, data.access_forbidden_groups_details || [])
+
+	mergeUsers(createAllowedUsersDetails.value)
+	mergeUsers(accessAllowedUsersDetails.value)
+	mergeUsers(accessForbiddenUsersDetails.value)
+	mergeGroups(createAllowedGroupsDetails.value)
+	mergeGroups(accessAllowedGroupsDetails.value)
+	mergeGroups(accessForbiddenGroupsDetails.value)
+}
+
 async function fetchSettings() {
 	try {
 		const url = generateUrl('/apps/customusergroups/api/v1/admin/settings')
-		const res = await axios.get<AdminSettingsResponse>(url)
-		if (res.data && res.data.settings) {
-			const s = res.data.settings
-			createRestrictionEnabled.value = s.create_restriction_enabled
-			createAllowedUsers.value = s.create_allowed_users || []
-			createAllowedGroups.value = s.create_allowed_groups || []
-			createAllowedUsersDetails.value = res.data.create_allowed_users_details || []
-			createAllowedGroupsDetails.value = res.data.create_allowed_groups_details || []
-
-			accessRestrictionEnabled.value = s.access_restriction_enabled
-			accessForbiddenUsers.value = s.access_forbidden_users || []
-			accessForbiddenGroups.value = s.access_forbidden_groups || []
-			accessForbiddenUsersDetails.value = res.data.access_forbidden_users_details || []
-			accessForbiddenGroupsDetails.value = res.data.access_forbidden_groups_details || []
-
-			mergeUsers(createAllowedUsersDetails.value)
-			mergeUsers(accessForbiddenUsersDetails.value)
-			mergeGroups(createAllowedGroupsDetails.value)
-			mergeGroups(accessForbiddenGroupsDetails.value)
+		const res = await axios.get<AdminSettingsResponse>(url, {
+			params: { _nocache: Date.now() },
+			headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+		})
+		if (res.data) {
+			applySettingsResponse(res.data)
 		}
 	} catch (err) {
 		console.error('Failed to load settings:', err)
@@ -449,11 +616,11 @@ const filteredAvailableCreateGroups = computed(() => {
 	)
 })
 
-// Filtered lists for App Access restriction
-const filteredAvailableAccessUsers = computed(() => {
-	const selected = new Set(accessForbiddenUsers.value)
+// Filtered lists for App Access restriction - Allowed
+const filteredAvailableAccessAllowedUsers = computed(() => {
+	const selected = new Set(accessAllowedUsers.value)
 	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
-	const query = userSearchAccess.value.trim().toLowerCase()
+	const query = userSearchAccessAllowed.value.trim().toLowerCase()
 	if (!query) return unselected.slice(0, 50)
 	return unselected.filter(
 		(u) =>
@@ -463,10 +630,36 @@ const filteredAvailableAccessUsers = computed(() => {
 	)
 })
 
-const filteredAvailableAccessGroups = computed(() => {
+const filteredAvailableAccessAllowedGroups = computed(() => {
+	const selected = new Set(accessAllowedGroups.value)
+	const unselected = allSystemGroups.value.filter((g) => !selected.has(g.id))
+	const query = groupSearchAccessAllowed.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(g) =>
+			g.name.toLowerCase().includes(query)
+			|| g.id.toLowerCase().includes(query),
+	)
+})
+
+// Filtered lists for App Access restriction - Forbidden
+const filteredAvailableAccessForbiddenUsers = computed(() => {
+	const selected = new Set(accessForbiddenUsers.value)
+	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
+	const query = userSearchAccessForbidden.value.trim().toLowerCase()
+	if (!query) return unselected.slice(0, 50)
+	return unselected.filter(
+		(u) =>
+			u.displayName.toLowerCase().includes(query)
+			|| u.uid.toLowerCase().includes(query)
+			|| (u.email && u.email.toLowerCase().includes(query)),
+	)
+})
+
+const filteredAvailableAccessForbiddenGroups = computed(() => {
 	const selected = new Set(accessForbiddenGroups.value)
 	const unselected = allSystemGroups.value.filter((g) => !selected.has(g.id))
-	const query = groupSearchAccess.value.trim().toLowerCase()
+	const query = groupSearchAccessForbidden.value.trim().toLowerCase()
 	if (!query) return unselected.slice(0, 50)
 	return unselected.filter(
 		(g) =>
@@ -499,26 +692,50 @@ function removeCreateGroup(gid: string) {
 	createAllowedGroupsDetails.value = createAllowedGroupsDetails.value.filter((g) => g.id !== gid)
 }
 
-function addAccessUser(user: UserOption) {
+function addAccessAllowedUser(user: UserOption) {
+	if (!accessAllowedUsers.value.includes(user.uid)) {
+		accessAllowedUsers.value.push(user.uid)
+		accessAllowedUsersDetails.value.push({ ...user })
+	}
+}
+
+function removeAccessAllowedUser(uid: string) {
+	accessAllowedUsers.value = accessAllowedUsers.value.filter((id) => id !== uid)
+	accessAllowedUsersDetails.value = accessAllowedUsersDetails.value.filter((u) => u.uid !== uid)
+}
+
+function addAccessAllowedGroup(group: GroupOption) {
+	if (!accessAllowedGroups.value.includes(group.id)) {
+		accessAllowedGroups.value.push(group.id)
+		accessAllowedGroupsDetails.value.push({ ...group })
+	}
+}
+
+function removeAccessAllowedGroup(gid: string) {
+	accessAllowedGroups.value = accessAllowedGroups.value.filter((id) => id !== gid)
+	accessAllowedGroupsDetails.value = accessAllowedGroupsDetails.value.filter((g) => g.id !== gid)
+}
+
+function addAccessForbiddenUser(user: UserOption) {
 	if (!accessForbiddenUsers.value.includes(user.uid)) {
 		accessForbiddenUsers.value.push(user.uid)
 		accessForbiddenUsersDetails.value.push({ ...user })
 	}
 }
 
-function removeAccessUser(uid: string) {
+function removeAccessForbiddenUser(uid: string) {
 	accessForbiddenUsers.value = accessForbiddenUsers.value.filter((id) => id !== uid)
 	accessForbiddenUsersDetails.value = accessForbiddenUsersDetails.value.filter((u) => u.uid !== uid)
 }
 
-function addAccessGroup(group: GroupOption) {
+function addAccessForbiddenGroup(group: GroupOption) {
 	if (!accessForbiddenGroups.value.includes(group.id)) {
 		accessForbiddenGroups.value.push(group.id)
 		accessForbiddenGroupsDetails.value.push({ ...group })
 	}
 }
 
-function removeAccessGroup(gid: string) {
+function removeAccessForbiddenGroup(gid: string) {
 	accessForbiddenGroups.value = accessForbiddenGroups.value.filter((id) => id !== gid)
 	accessForbiddenGroupsDetails.value = accessForbiddenGroupsDetails.value.filter((g) => g.id !== gid)
 }
@@ -531,13 +748,19 @@ async function save() {
 			create_allowed_users: createAllowedUsers.value,
 			create_allowed_groups: createAllowedGroups.value,
 			access_restriction_enabled: accessRestrictionEnabled.value,
+			access_allowed_users: accessAllowedUsers.value,
+			access_allowed_groups: accessAllowedGroups.value,
 			access_forbidden_users: accessForbiddenUsers.value,
 			access_forbidden_groups: accessForbiddenGroups.value,
 		}
 		const url = generateUrl('/apps/customusergroups/api/v1/admin/settings')
-		await axios.post(url, payload)
+		const res = await axios.post<AdminSettingsResponse>(url, payload)
 		showSuccess('Настройки успешно сохранены')
-		await fetchSettings()
+		if (res.data && res.data.settings) {
+			applySettingsResponse(res.data)
+		} else {
+			await fetchSettings()
+		}
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
 		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка сохранения настроек'
@@ -580,7 +803,7 @@ async function save() {
 }
 
 .info-callout {
-	font-size: 13px;
+	font-size: 14px;
 	line-height: 1.4;
 	color: var(--color-text-maxcontrast);
 	background: var(--color-main-background);
@@ -644,18 +867,14 @@ async function save() {
 }
 
 .item-primary {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--color-main-text);
 }
 
 .item-secondary {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
-}
-
-.item-forbidden .item-primary {
-	color: var(--color-error, #e9322d);
 }
 
 .cug-badge {

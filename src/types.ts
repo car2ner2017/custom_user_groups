@@ -126,6 +126,8 @@ export interface AdminSettingsData {
 	create_allowed_users: string[]
 	create_allowed_groups: string[]
 	access_restriction_enabled: boolean
+	access_allowed_users: string[]
+	access_allowed_groups: string[]
 	access_forbidden_users: string[]
 	access_forbidden_groups: string[]
 }
@@ -134,6 +136,8 @@ export interface AdminSettingsResponse {
 	settings: AdminSettingsData
 	create_allowed_users_details: UserOption[]
 	create_allowed_groups_details: GroupOption[]
+	access_allowed_users_details: UserOption[]
+	access_allowed_groups_details: GroupOption[]
 	access_forbidden_users_details: UserOption[]
 	access_forbidden_groups_details: GroupOption[]
 }
