@@ -242,6 +242,13 @@ class GroupApiController extends Controller {
 			}
 		}
 
+		if (!$transferOwnership && !in_array($currentOwnerId, $validMemberIds, true)) {
+			return new JSONResponse(
+				['error' => 'Владелец группы должен оставаться участником группы или передать владение другому участнику'],
+				Http::STATUS_BAD_REQUEST
+			);
+		}
+
 		try {
 			$oldMembers = $existing['member_ids'];
 			$toAdd = array_values(array_diff($validMemberIds, $oldMembers));
@@ -1075,7 +1082,7 @@ class GroupApiController extends Controller {
 		try {
 			$node = $share->getNode();
 			$nodeName = $node ? $node->getName() : '';
-		} catch (Exception) {
+		} catch (\Throwable) {
 			$nodeName = $share->getTarget() ?: 'ресурс';
 		}
 		if ($nodeName === '') {
