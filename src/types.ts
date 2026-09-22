@@ -116,6 +116,8 @@ export interface GroupActivity {
 
 export interface AppState {
 	current_user_id: string | null
+	current_user_displayName?: string
+	current_user_email?: string
 	is_admin: boolean
 	can_create_groups?: boolean
 	groups: CustomGroup[]

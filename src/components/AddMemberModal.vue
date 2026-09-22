@@ -30,7 +30,8 @@
 							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
 						</div>
 						<NcButton
-							type="error"
+							type="button"
+							variant="error"
 							size="small"
 							:disabled="saving"
 							@click="removeSelected(user.uid)">
@@ -65,7 +66,8 @@
 							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
 						</div>
 						<NcButton
-							type="tertiary"
+							type="button"
+							variant="tertiary"
 							size="small"
 							:disabled="saving"
 							@click.stop="addSelected(user)">
@@ -81,14 +83,15 @@
 			<!-- Modal Actions -->
 			<div class="modal-actions">
 				<NcButton
-					type="secondary"
+					type="button"
+					variant="secondary"
 					:disabled="saving"
 					@click="$emit('close')">
 					Отмена
 				</NcButton>
 				<NcButton
-					type="primary"
-					native-type="submit"
+					type="submit"
+					variant="primary"
 					:disabled="saving || selectedUsers.length === 0">
 					{{ saving ? 'Сохранение...' : 'Сохранить' }}
 				</NcButton>

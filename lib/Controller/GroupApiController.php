@@ -126,6 +126,7 @@ class GroupApiController extends Controller {
 				$validMemberIds[] = $uid;
 			}
 		}
+		$validMemberIds = array_values(array_unique($validMemberIds));
 
 		// Auto-generate group ID exclusively
 		$cleanGid = 'cug_' . substr(md5($name . microtime()), 0, 8);
@@ -215,6 +216,7 @@ class GroupApiController extends Controller {
 				$validMemberIds[] = $uid;
 			}
 		}
+		$validMemberIds = array_values(array_unique($validMemberIds));
 
 		// Ownership transfer validation
 		$newOwnerId = ($newOwnerId !== null) ? trim($newOwnerId) : null;
@@ -240,13 +242,6 @@ class GroupApiController extends Controller {
 					Http::STATUS_BAD_REQUEST
 				);
 			}
-		}
-
-		if (!$transferOwnership && !in_array($currentOwnerId, $validMemberIds, true)) {
-			return new JSONResponse(
-				['error' => 'Владелец группы должен оставаться участником группы или передать владение другому участнику'],
-				Http::STATUS_BAD_REQUEST
-			);
 		}
 
 		try {
@@ -284,6 +279,15 @@ class GroupApiController extends Controller {
 				]);
 			}
 			foreach ($toRemove as $uid) {
+				$del = $this->delegationMapper->getDelegation($groupId, $uid);
+				if ($del !== null) {
+					$this->delegationMapper->removeDelegation($groupId, $uid);
+					$this->auditService->auditDelegationRevoked($groupId, $name, $uid, $del->getLevel(), $currentUid);
+					$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_DELEGATION_REVOKE, $currentUid, $uid, [
+						'level' => $del->getLevel(),
+						'reason' => 'member_removed',
+					]);
+				}
 				$this->auditService->auditMemberRemoved($groupId, $name, $uid, $currentUid);
 				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_REMOVE, $currentUid, $uid);
 			}

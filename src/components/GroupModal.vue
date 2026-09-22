@@ -25,6 +25,16 @@
 				</small>
 			</div>
 
+			<!-- Add Self Checkbox (only in Create mode) -->
+			<div v-if="!isEdit" class="form-group add-self-group">
+				<NcCheckboxRadioSwitch
+					v-model="isSelfSelected"
+					type="checkbox"
+					:disabled="loading">
+					Добавить себя как участника группы
+				</NcCheckboxRadioSwitch>
+			</div>
+
 			<!-- Group Owner Field (Transfer ownership) -->
 			<div v-if="isEdit && canTransferOwnership" class="form-group">
 				<label for="group-owner" class="form-label">
@@ -77,7 +87,8 @@
 							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
 						</div>
 						<NcButton
-							type="error"
+							type="button"
+							variant="error"
 							size="small"
 							:disabled="loading"
 							@click.stop="removeUser(user.uid)">
@@ -119,7 +130,8 @@
 							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
 						</div>
 						<NcButton
-							type="tertiary"
+							type="button"
+							variant="tertiary"
 							size="small"
 							:disabled="loading"
 							@click.stop="addUser(user)">
@@ -135,14 +147,15 @@
 			<!-- Modal Actions -->
 			<div class="modal-actions">
 				<NcButton
-					type="secondary"
+					type="button"
+					variant="secondary"
 					:disabled="loading"
 					@click="$emit('close')">
 					Отмена
 				</NcButton>
 				<NcButton
-					type="primary"
-					native-type="submit"
+					type="submit"
+					variant="primary"
 					:disabled="loading || name.trim() === '' || (isEdit && !hasChanges)">
 					{{ isEdit ? 'Сохранить изменения' : 'Создать группу' }}
 				</NcButton>
@@ -153,8 +166,9 @@
 		<ConfirmModal
 			:show="showSelfRemoveConfirm"
 			title="Предупреждение"
-			message="Внимание: вы удаляете себя из этой пользовательской группы. После сохранения вы потеряете доступ к группе и делегированные права управления/модерации, если они были назначены."
-			confirm-text="Удалить себя"
+			message="Внимание: вы удаляете себя из этой пользовательской группы. После удаления вы потеряете доступ к группе и делегированные права управления/модерации. Продолжить?"
+			confirm-text="Продолжить"
+			:loading="loading"
 			@close="cancelSelfRemoval"
 			@confirm="confirmSelfRemoval" />
 	</NcModal>
@@ -165,6 +179,7 @@ import { ref, computed, watch } from 'vue'
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
+import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
@@ -177,6 +192,8 @@ const props = defineProps<{
 	group: CustomGroup | null
 	isAdmin?: boolean
 	currentUserId?: string | null
+	currentUserDisplayName?: string
+	currentUserEmail?: string
 }>()
 
 const emit = defineEmits<{
@@ -221,6 +238,32 @@ const loadingUsers = ref(false)
 const showSelfRemoveConfirm = ref(false)
 const pendingRemoveUid = ref<string | null>(null)
 
+const isSelfSelected = computed({
+	get: () => {
+		if (!props.currentUserId) return false
+		return selectedUsers.value.some((u) => u.uid === props.currentUserId)
+	},
+	set: (val: boolean) => {
+		toggleAddSelf(val)
+	},
+})
+
+function toggleAddSelf(checked: boolean) {
+	if (!props.currentUserId) return
+	if (checked) {
+		if (!selectedUsers.value.some((u) => u.uid === props.currentUserId)) {
+			const found = availableUsers.value.find((u) => u.uid === props.currentUserId)
+			selectedUsers.value.push({
+				uid: props.currentUserId,
+				displayName: found?.displayName || props.currentUserDisplayName || props.currentUserId,
+				email: found?.email || props.currentUserEmail || '',
+			})
+		}
+	} else {
+		selectedUsers.value = selectedUsers.value.filter((u) => u.uid !== props.currentUserId)
+	}
+}
+
 const hasChanges = computed(() => {
 	if (!props.group) {
 		return false
@@ -258,8 +301,18 @@ watch(
 				selectedNewOwnerId.value = ''
 			} else {
 				name.value = ''
-				selectedUsers.value = []
 				selectedNewOwnerId.value = ''
+				if (props.currentUserId) {
+					selectedUsers.value = [
+						{
+							uid: props.currentUserId,
+							displayName: props.currentUserDisplayName || props.currentUserId,
+							email: props.currentUserEmail || '',
+						},
+					]
+				} else {
+					selectedUsers.value = []
+				}
 			}
 			selectedMembersFilter.value = ''
 			userSearchQuery.value = ''
@@ -321,7 +374,7 @@ function cancelSelfRemoval() {
 	pendingRemoveUid.value = null
 }
 
-function confirmSelfRemoval() {
+async function confirmSelfRemoval() {
 	if (pendingRemoveUid.value) {
 		const uid = pendingRemoveUid.value
 		selectedUsers.value = selectedUsers.value.filter((u) => u.uid !== uid)
@@ -331,29 +384,26 @@ function confirmSelfRemoval() {
 	}
 	showSelfRemoveConfirm.value = false
 	pendingRemoveUid.value = null
+	await submitForm()
 }
 
 function removeUser(uid: string) {
 	if (isEdit.value && props.group) {
-		const isOwner = (uid === currentOwnerUid.value)
-		// Owner cannot be removed without transferring ownership first
-		if (isOwner && (!selectedNewOwnerId.value || selectedNewOwnerId.value === currentOwnerUid.value)) {
-			showError('Владелец группы не может быть удален из списка участников. Для этого необходимо сначала передать владение группой другому участнику.')
-			return
-		}
-
-		// Check if user is removing themselves and has manage or moderate role
+		const isOwner = Boolean(props.group.is_owner || uid === currentOwnerUid.value)
 		const isSelf = Boolean(props.currentUserId && uid === props.currentUserId)
-		const userDelegationLevel = props.group.permissions?.delegation_level
-		const isDelegate = props.group.delegations?.some((d) => d.user_id === uid)
-			|| props.group.delegates_manage?.some((d) => d.user_id === uid)
-			|| props.group.delegates_moderate?.some((d) => d.user_id === uid)
-		const isManagerOrModerator = userDelegationLevel === 'manage' || userDelegationLevel === 'moderate' || isDelegate
 
-		if (isSelf && (isManagerOrModerator || isOwner)) {
-			pendingRemoveUid.value = uid
-			showSelfRemoveConfirm.value = true
-			return
+		if (isSelf && !isOwner) {
+			const userDelegationLevel = props.group.permissions?.delegation_level
+			const isDelegate = props.group.delegations?.some((d) => d.user_id === uid)
+				|| props.group.delegates_manage?.some((d) => d.user_id === uid)
+				|| props.group.delegates_moderate?.some((d) => d.user_id === uid)
+			const isManagerOrModerator = userDelegationLevel === 'manage' || userDelegationLevel === 'moderate' || isDelegate
+
+			if (isManagerOrModerator) {
+				pendingRemoveUid.value = uid
+				showSelfRemoveConfirm.value = true
+				return
+			}
 		}
 	}
 
@@ -422,6 +472,11 @@ async function submitForm() {
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
+}
+
+.add-self-group {
+	margin-top: -6px;
+	margin-bottom: 4px;
 }
 
 .form-label {

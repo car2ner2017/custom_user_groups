@@ -10,13 +10,15 @@
 			</p>
 			<div class="confirm-actions">
 				<NcButton
-					type="secondary"
+					type="button"
+					variant="secondary"
 					:disabled="loading"
 					@click="$emit('close')">
 					Отмена
 				</NcButton>
 				<NcButton
-					type="error"
+					type="button"
+					variant="error"
 					:disabled="loading"
 					@click="$emit('confirm')">
 					{{ confirmText || 'Удалить' }}

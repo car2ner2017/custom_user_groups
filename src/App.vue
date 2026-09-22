@@ -349,6 +349,8 @@
 			:group="modalGroup"
 			:is-admin="isAdmin"
 			:current-user-id="currentUserId"
+			:current-user-display-name="currentUserDisplayName"
+			:current-user-email="currentUserEmail"
 			@close="showGroupModal = false"
 			@saved="onGroupSaved" />
 
@@ -443,6 +445,8 @@ const initialState = loadState<AppState>('customusergroups', 'customusergroups-s
 })
 
 const currentUserId = ref(initialState.current_user_id)
+const currentUserDisplayName = ref(initialState.current_user_displayName || initialState.current_user_id || '')
+const currentUserEmail = ref(initialState.current_user_email || '')
 const isAdmin = ref(initialState.is_admin)
 const canCreateGroups = ref(initialState.can_create_groups ?? true)
 const allGroups = ref<CustomGroup[]>(initialState.groups || [])

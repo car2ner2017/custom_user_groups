@@ -158,8 +158,11 @@ class PageController extends Controller {
 			];
 		}
 
+		$currentUser = ($this->userId !== null) ? $this->userManager->get($this->userId) : null;
 		$state = [
 			'current_user_id' => $this->userId,
+			'current_user_displayName' => $currentUser ? $currentUser->getDisplayName() : $this->userId,
+			'current_user_email' => ($currentUser && $currentUser->getEMailAddress()) ? $currentUser->getEMailAddress() : '',
 			'is_admin' => $isAdmin,
 			'can_create_groups' => $canCreateGroups,
 			'groups' => $groups,
