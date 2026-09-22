@@ -9,9 +9,9 @@ declare(strict_types=1);
 ?>
 <div class="emptycontent" style="margin-top: 15vh; text-align: center;">
 	<div class="icon-error-dark" style="font-size: 64px; margin-bottom: 20px;"></div>
-	<h2><?php p($l->t('Доступ ограничен')); ?></h2>
+	<h2><?php p($l->t('Access restricted')); ?></h2>
 	<p style="font-size: 16px; color: var(--color-text-maxcontrast);">
-		<?php p($l->t('Доступ к приложению «Пользовательские группы» ограничен администратором системы.')); ?>
+		<?php p($l->t('Access to the Custom user groups app has been restricted by the system administrator.')); ?>
 	</p>
 </div>
 

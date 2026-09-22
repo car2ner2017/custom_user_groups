@@ -11,7 +11,7 @@
 						<template #icon>
 							<span class="icon-plus">＋</span>
 						</template>
-						Создать группу
+						{{ t('Create group') }}
 					</NcButton>
 				</div>
 
@@ -19,13 +19,13 @@
 				<div class="nav-search-wrapper">
 					<NcTextField
 						v-model="groupSearchQuery"
-						placeholder="Поиск групп..."
+						:placeholder="t('Search groups…')"
 						size="small" />
 				</div>
 
 				<!-- Filter Categories -->
 				<NcAppNavigationItem
-					name="Все доступные"
+					:name="t('All available')"
 					:active="currentFilter === 'all'"
 					@click="currentFilter = 'all'">
 					<template #counter>
@@ -34,7 +34,7 @@
 				</NcAppNavigationItem>
 
 				<NcAppNavigationItem
-					name="Созданные мной"
+					:name="t('Created by me')"
 					:active="currentFilter === 'mine'"
 					@click="currentFilter = 'mine'">
 					<template #counter>
@@ -43,7 +43,7 @@
 				</NcAppNavigationItem>
 
 				<NcAppNavigationItem
-					name="Группы со мной"
+					:name="t('Joined groups')"
 					:active="currentFilter === 'member'"
 					@click="currentFilter = 'member'">
 					<template #counter>
@@ -55,10 +55,10 @@
 
 				<!-- Groups List -->
 				<div v-if="loadingGroups" class="nav-loading">
-					<NcLoadingIcon :size="24" /> Загрузка...
+					<NcLoadingIcon :size="24" /> {{ t('Loading…') }}
 				</div>
 				<div v-else-if="filteredGroups.length === 0" class="nav-empty">
-					Группы не найдены
+					{{ t('No groups found') }}
 				</div>
 				<div v-else class="groups-nav-list">
 					<NcAppNavigationItem
@@ -87,21 +87,21 @@
 							<div class="group-meta">
 								<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
 								<span v-if="isAdmin || selectedGroup.is_owner" class="meta-tag creator-tag">
-									Создатель: {{ selectedGroup.creator_displayName }}
+									{{ t('Creator:') }} {{ selectedGroup.creator_displayName }}
 									<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
 								</span>
 								<span class="meta-tag owner-tag">
-									Владелец: {{ selectedGroup.owner_displayName || selectedGroup.creator_displayName }}
+									{{ t('Owner:') }} {{ selectedGroup.owner_displayName || selectedGroup.creator_displayName }}
 									<template v-if="selectedGroup.owner_email || (!selectedGroup.owner_id && selectedGroup.creator_email)">
 										({{ selectedGroup.owner_email || selectedGroup.creator_email }})
 									</template>
 								</span>
-								<span class="meta-tag date-tag">Создана: {{ formatDate(selectedGroup.created_at) }}</span>
-								<span v-if="isAdmin" class="role-badge admin-badge">Вы Администратор</span>
-								<span v-if="selectedGroup.is_owner" class="role-badge owner-badge">Вы владелец</span>
-								<span v-if="selectedGroup.is_creator && !selectedGroup.is_owner" class="role-badge creator-badge">Вы создатель</span>
-								<span v-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">Вы управляющий</span>
-								<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">Вы модератор</span>
+								<span class="meta-tag date-tag">{{ t('Created:') }} {{ formatDate(selectedGroup.created_at) }}</span>
+								<span v-if="isAdmin" class="role-badge admin-badge">{{ t('You are Administrator') }}</span>
+								<span v-if="selectedGroup.is_owner" class="role-badge owner-badge">{{ t('You are Owner') }}</span>
+								<span v-if="selectedGroup.is_creator && !selectedGroup.is_owner" class="role-badge creator-badge">{{ t('You are Creator') }}</span>
+								<span v-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">{{ t('You are Manager') }}</span>
+								<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">{{ t('You are Moderator') }}</span>
 							</div>
 						</div>
 					</div>
@@ -111,13 +111,13 @@
 							v-if="selectedGroup.permissions?.can_view_history"
 							type="tertiary"
 							@click="showActivityModal = true">
-							История действий
+							{{ t('Activity log') }}
 						</NcButton>
 						<NcButton
 							v-if="selectedGroup.permissions?.can_manage_shares"
 							type="tertiary"
 							@click="showSharesModal = true">
-							Общие ресурсы
+							{{ t('Shared resources') }}
 						</NcButton>
 						<div
 							v-if="hasLeadingActions && hasTrailingActions"
@@ -126,26 +126,26 @@
 							v-if="selectedGroup.permissions?.can_delegate"
 							type="tertiary"
 							@click="openDelegationModal">
-							Делегирование
+							{{ t('Delegation') }}
 						</NcButton>
 						<NcButton
 							v-if="selectedGroup.permissions?.can_edit_members || selectedGroup.permissions?.can_edit_name"
 							type="secondary"
 							@click="openEditModal(selectedGroup)">
-							Редактировать
+							{{ t('Edit') }}
 						</NcButton>
 						<NcButton
 							v-if="selectedGroup.permissions?.can_delete"
 							type="error"
 							@click="openDeleteModal(selectedGroup)">
-							Удалить
+							{{ t('Delete') }}
 						</NcButton>
 					</div>
 
 					<!-- Delegations Metadata Section (visible only when there are assigned delegates) -->
 					<div v-if="hasDelegates" class="delegation-meta-box">
 						<div class="delegation-line">
-							<span class="delegation-label">Управляющие:</span>
+							<span class="delegation-label">{{ t('Managers:') }}</span>
 							<span v-if="selectedGroup.delegates_manage?.length > 0" class="delegates-tags">
 								<span
 									v-for="d in selectedGroup.delegates_manage"
@@ -154,11 +154,11 @@
 									{{ d.displayName }} ({{ d.email || d.user_id }})
 								</span>
 							</span>
-							<span v-else class="no-delegates">Отсутствуют</span>
+							<span v-else class="no-delegates">{{ t('None') }}</span>
 						</div>
 
 						<div class="delegation-line">
-							<span class="delegation-label">Модераторы:</span>
+							<span class="delegation-label">{{ t('Moderators:') }}</span>
 							<span v-if="selectedGroup.delegates_moderate?.length > 0" class="delegates-tags">
 								<span
 									v-for="d in selectedGroup.delegates_moderate"
@@ -167,7 +167,7 @@
 									{{ d.displayName }} ({{ d.email || d.user_id }})
 								</span>
 							</span>
-							<span v-else class="no-delegates">Отсутствуют</span>
+							<span v-else class="no-delegates">{{ t('None') }}</span>
 						</div>
 					</div>
 				</header>
@@ -176,7 +176,7 @@
 				<section v-if="selectedGroup.permissions?.can_moderate_requests" class="group-requests-section">
 					<div class="requests-header">
 						<h2>
-							Запросы на добавление участников
+							{{ t('Membership requests') }}
 							<span v-if="pendingRequestsCount > 0" class="pending-badge">{{ pendingRequestsCount }}</span>
 						</h2>
 						<div class="requests-header-actions">
@@ -184,22 +184,22 @@
 								type="secondary"
 								size="small"
 								@click="showHistoryModal = true">
-								История запросов
+								{{ t('Request history') }}
 							</NcButton>
 							<NcButton
 								type="tertiary-no-background"
 								size="small"
 								@click="fetchGroupRequests">
-								Обновить заявки
+								{{ t('Refresh requests') }}
 							</NcButton>
 						</div>
 					</div>
 
 					<div v-if="loadingRequests" class="loading-requests">
-						<NcLoadingIcon :size="20" /> Загрузка запросов...
+						<NcLoadingIcon :size="20" /> {{ t('Loading requests…') }}
 					</div>
 					<div v-else-if="inlineGroupRequests.length === 0" class="no-requests-hint">
-						Нет активных запросов на рассмотрение
+						{{ t('No pending requests to review') }}
 					</div>
 					<div v-else class="requests-list">
 						<div
@@ -220,34 +220,34 @@
 											size="small"
 											:disabled="processingRequestId === req.id"
 											@click="approveRequest(req.id)">
-											Принять
+											{{ t('Approve') }}
 										</NcButton>
 										<NcButton
 											type="error"
 											size="small"
 											:disabled="processingRequestId === req.id"
 											@click="rejectRequest(req.id)">
-											Отклонить
+											{{ t('Reject') }}
 										</NcButton>
 									</template>
 									<span v-else-if="req.status === 'approved'" class="status-badge status-approved">
-										Одобрен
+										{{ t('Approved') }}
 									</span>
 									<span v-else-if="req.status === 'rejected'" class="status-badge status-rejected">
-										Отклонен
+										{{ t('Rejected') }}
 									</span>
 								</div>
 							</div>
 
 							<div class="request-meta-row">
 								<span class="request-author">
-									Предложил: <strong>{{ req.requester_displayName }}</strong> ({{ '@' + req.requester_id }}) в {{ formatDate(req.created_at) }}
+									{{ t('Suggested by:') }} <strong>{{ req.requester_displayName }}</strong> ({{ '@' + req.requester_id }}) {{ t('at {time}', { time: formatDate(req.created_at) }) }}
 								</span>
 								<span v-if="req.status !== 'pending' && req.processed_by" class="request-resolver">
-									{{ req.status === 'approved' ? 'Одобрил' : 'Отклонил' }}:
+									{{ req.status === 'approved' ? t('Approved by') : t('Rejected by') }}:
 									<strong>{{ req.processed_by_displayName || req.processed_by }}</strong>
 									<template v-if="req.processed_by_email || req.processed_by">({{ req.processed_by_email || ('@' + req.processed_by) }})</template>
-									в {{ formatDate(req.updated_at) }}
+									{{ t('at {time}', { time: formatDate(req.updated_at) }) }}
 								</span>
 							</div>
 						</div>
@@ -258,32 +258,32 @@
 				<section class="group-members-section">
 					<div class="members-header">
 						<div class="members-header-title">
-							<h2>Участники группы ({{ selectedGroup.member_count }})</h2>
+							<h2>{{ t('Group members') }} ({{ selectedGroup.member_count }})</h2>
 							<NcButton
 								v-if="canDirectAddMembers"
 								type="primary"
 								size="small"
 								@click="openAddMemberModal">
-								Добавить участника
+								{{ t('Add member') }}
 							</NcButton>
 							<NcButton
 								v-else-if="selectedGroup.permissions?.can_request_member"
 								type="tertiary"
 								size="small"
 								@click="openRequestMemberModal">
-								+ Предложить участника
+								+ {{ t('Request member') }}
 							</NcButton>
 						</div>
 						<div class="members-search-wrapper">
 							<NcTextField
 								v-model="memberSearchQuery"
-								placeholder="Фильтр участников..."
+								:placeholder="t('Filter members…')"
 								size="small" />
 						</div>
 					</div>
 
 					<div v-if="filteredMembers.length === 0" class="empty-members-list">
-						{{ selectedGroup.member_count === 0 ? 'В группе пока нет участников' : 'Участники по запросу не найдены' }}
+						{{ selectedGroup.member_count === 0 ? t('No members in group yet') : t('No members found matching query') }}
 					</div>
 					<div v-else class="members-grid">
 						<div
@@ -303,22 +303,22 @@
 								<span
 									v-if="member.uid === (selectedGroup.owner_id || selectedGroup.creator_id)"
 									class="member-badge owner-tag">
-									Владелец
+									{{ t('Owner') }}
 								</span>
 								<span
 									v-if="member.uid === selectedGroup.creator_id && selectedGroup.creator_id !== (selectedGroup.owner_id || selectedGroup.creator_id) && (isAdmin || selectedGroup.is_owner)"
 									class="member-badge creator-tag">
-									Создатель
+									{{ t('Creator') }}
 								</span>
 								<span
 									v-if="getMemberDelegationLevel(member.uid) === 'manage'"
 									class="member-badge manage-tag">
-									Управление
+									{{ t('Manage') }}
 								</span>
 								<span
 									v-else-if="getMemberDelegationLevel(member.uid) === 'moderate'"
 									class="member-badge moderate-tag">
-									Модерация
+									{{ t('Moderate') }}
 								</span>
 							</div>
 						</div>
@@ -329,14 +329,14 @@
 			<!-- Empty State -->
 			<div v-else class="empty-state-wrapper">
 				<NcEmptyContent
-					name="Пользовательские группы"
-					description="Выберите группу из списка слева или создайте новую для предоставления доступа к папкам и файлам">
+					:name="t('Custom user groups')"
+					:description="t('Select a group from the list on the left or create a new one to share folders and files')">
 					<template #action>
 						<NcButton
 							v-if="canCreateGroups"
 							type="primary"
 							@click="openCreateModal">
-							Создать группу
+							{{ t('Create group') }}
 						</NcButton>
 					</template>
 				</NcEmptyContent>
@@ -404,8 +404,8 @@
 		<!-- Delete Confirm Modal -->
 		<ConfirmModal
 			:show="showDeleteModal"
-			title="Удалить группу"
-			:message="`Вы уверены, что хотите удалить группу «${groupToDelete?.name}»? Это действие нельзя отменить.`"
+			:title="t('Delete group')"
+			:message="t('Are you sure you want to delete group &quot;{name}&quot;? This action cannot be undone.', { name: groupToDelete?.name || '' })"
 			:loading="deleting"
 			@close="showDeleteModal = false"
 			@confirm="confirmDelete" />
@@ -434,6 +434,7 @@ import RequestHistoryModal from './components/RequestHistoryModal.vue'
 import GroupActivityModal from './components/GroupActivityModal.vue'
 import GroupSharesModal from './components/GroupSharesModal.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import { t } from './utils/l10n'
 import type { AppState, CustomGroup, MembershipRequest } from './types'
 
 // Load initial state
@@ -584,10 +585,12 @@ const filteredMembers = computed(() => {
 
 const canDirectAddMembers = computed(() => {
 	if (!selectedGroup.value) return false
-	if (selectedGroup.value.is_creator || isAdmin.value) return true
+	if (selectedGroup.value.permissions && typeof selectedGroup.value.permissions.can_edit_members === 'boolean') {
+		return selectedGroup.value.permissions.can_edit_members
+	}
+	if (selectedGroup.value.is_owner || isAdmin.value) return true
 	const level = selectedGroup.value.permissions?.delegation_level
-	if (level === 'manage' || level === 'moderate') return true
-	return !!selectedGroup.value.permissions?.can_edit_members
+	return level === 'manage' || level === 'moderate'
 })
 
 function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
@@ -720,11 +723,11 @@ async function approveRequest(requestId: number) {
 				groupRequests.value[idx] = response.data.request
 			}
 		}
-		showSuccess('Запрос одобрен, пользователь добавлен в группу')
+		showSuccess(t('Request approved, user added to group'))
 		await reloadGroups()
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка одобрения запроса'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error approving request')
 		showError(msg)
 	} finally {
 		processingRequestId.value = null
@@ -743,10 +746,10 @@ async function rejectRequest(requestId: number) {
 				groupRequests.value[idx] = response.data.request
 			}
 		}
-		showSuccess('Запрос отклонен')
+		showSuccess(t('Request rejected'))
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка отклонения запроса'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error rejecting request')
 		showError(msg)
 	} finally {
 		processingRequestId.value = null
@@ -759,7 +762,7 @@ async function confirmDelete() {
 	try {
 		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${groupToDelete.value.group_id}`)
 		await axios.delete(url)
-		showSuccess('Группа успешно удалена')
+		showSuccess(t('Group deleted successfully'))
 		allGroups.value = allGroups.value.filter((g) => g.group_id !== groupToDelete.value?.group_id)
 		if (selectedGroupId.value === groupToDelete.value.group_id) {
 			selectedGroupId.value = allGroups.value.length > 0 ? allGroups.value[0].group_id : null
@@ -767,7 +770,7 @@ async function confirmDelete() {
 		showDeleteModal.value = false
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при удалении группы'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error deleting group')
 		showError(msg)
 	} finally {
 		deleting.value = false
@@ -778,7 +781,7 @@ function formatDate(dateStr?: string | null) {
 	if (!dateStr) return ''
 	try {
 		const d = new Date(dateStr)
-		return d.toLocaleDateString('ru-RU', {
+		return d.toLocaleDateString(undefined, {
 			year: 'numeric',
 			month: 'long',
 			day: 'numeric',

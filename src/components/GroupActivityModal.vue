@@ -6,7 +6,7 @@
 		@close="$emit('close')">
 		<div class="activity-modal-content">
 			<h2 class="form-title">
-				Журнал действий группы «{{ group.name }}»
+				{{ t('Activity log for group "{name}"', { name: group.name }) }}
 			</h2>
 
 			<div class="filters-bar">
@@ -16,47 +16,47 @@
 						class="tab-button"
 						:class="{ active: categoryFilter === 'all' }"
 						@click="categoryFilter = 'all'">
-						Все ({{ activities.length }})
+						{{ t('All') }} ({{ activities.length }})
 					</button>
 					<button
 						type="button"
 						class="tab-button"
 						:class="{ active: categoryFilter === 'members' }"
 						@click="categoryFilter = 'members'">
-						Участники ({{ countMembers }})
+						{{ t('Members') }} ({{ countMembers }})
 					</button>
 					<button
 						type="button"
 						class="tab-button"
 						:class="{ active: categoryFilter === 'delegations' }"
 						@click="categoryFilter = 'delegations'">
-						Делегирование ({{ countDelegations }})
+						{{ t('Delegation') }} ({{ countDelegations }})
 					</button>
 					<button
 						type="button"
 						class="tab-button"
 						:class="{ active: categoryFilter === 'settings' }"
 						@click="categoryFilter = 'settings'">
-						Настройки ({{ countSettings }})
+						{{ t('Settings') }} ({{ countSettings }})
 					</button>
 				</div>
 
 				<div class="search-input-wrapper">
 					<NcTextField
 						v-model="searchFilter"
-						placeholder="Поиск по действию, участнику или автору..."
+						:placeholder="t('Search by action, member or initiator…')"
 						size="small" />
 				</div>
 			</div>
 
 			<div v-if="loading" class="loading-state">
-				<NcLoadingIcon :size="24" /> Загрузка журнала действий...
+				<NcLoadingIcon :size="24" /> {{ t('Loading activity log…') }}
 			</div>
 			<div v-else-if="activities.length === 0" class="empty-state">
-				В журнале этой группы пока нет записей.
+				{{ t('No activities recorded for this group yet.') }}
 			</div>
 			<div v-else-if="filteredActivities.length === 0" class="empty-state">
-				Действия не найдены по заданным критериям поиска.
+				{{ t('No activities found matching the filter criteria.') }}
 			</div>
 			<div v-else class="activities-list">
 				<div
@@ -77,7 +77,7 @@
 
 					<div class="card-details">
 						<div class="detail-row">
-							<span class="detail-label">Инициатор:</span>
+							<span class="detail-label">{{ t('Initiator:') }}</span>
 							<span class="detail-value font-semibold">
 								{{ act.actor_displayName }}
 								<span class="detail-sub">({{ act.actor_email || ('@' + act.actor_id) }})</span>
@@ -85,7 +85,7 @@
 						</div>
 
 						<div v-if="act.target_displayName || act.target_id" class="detail-row">
-							<span class="detail-label">Пользователь:</span>
+							<span class="detail-label">{{ t('User:') }}</span>
 							<span class="detail-value">
 								{{ act.target_displayName || act.target_id }}
 								<span v-if="act.target_email || act.target_id" class="detail-sub">
@@ -96,7 +96,7 @@
 
 						<!-- Specific details for name change -->
 						<div v-if="act.action_type === 'name_change' && act.details?.old_name && act.details?.new_name" class="detail-row">
-							<span class="detail-label">Изменение:</span>
+							<span class="detail-label">{{ t('Change:') }}</span>
 							<span class="detail-value">
 								«{{ act.details.old_name }}» - «{{ act.details.new_name }}»
 							</span>
@@ -104,9 +104,9 @@
 
 						<!-- Specific details for delegation -->
 						<div v-if="act.details?.level" class="detail-row">
-							<span class="detail-label">Уровень прав:</span>
+							<span class="detail-label">{{ t('Permission level:') }}</span>
 							<span class="detail-value font-semibold">
-								{{ act.details.level === 'manage' ? 'Управление' : 'Модерация' }}
+								{{ act.details.level === 'manage' ? t('Manage') : t('Moderate') }}
 							</span>
 						</div>
 					</div>
@@ -117,7 +117,7 @@
 				<NcButton
 					type="secondary"
 					@click="$emit('close')">
-					Закрыть
+					{{ t('Close') }}
 				</NcButton>
 			</div>
 		</div>
@@ -132,6 +132,7 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { t } from '../utils/l10n'
 import type { CustomGroup, GroupActivity } from '../types'
 
 const props = defineProps<{
@@ -213,21 +214,21 @@ const filteredActivities = computed(() => {
 function getActionLabel(type: string): string {
 	switch (type) {
 	case 'member_add':
-		return 'Добавление участника'
+		return t('Member added')
 	case 'member_remove':
-		return 'Удаление участника'
+		return t('Member removed')
 	case 'delegation_assign':
-		return 'Назначение прав'
+		return t('Permission granted')
 	case 'delegation_revoke':
-		return 'Отзыв прав'
+		return t('Permission revoked')
 	case 'name_change':
-		return 'Переименование группы'
+		return t('Group renamed')
 	case 'owner_transfer':
-		return 'Передача владения'
+		return t('Ownership transferred')
 	case 'share_unshare':
-		return 'Отзыв доступа к ресурсу'
+		return t('Access revoked')
 	default:
-		return 'Действие'
+		return t('Action')
 	}
 }
 
@@ -235,7 +236,7 @@ function formatDate(dateStr?: string | null): string {
 	if (!dateStr) return ''
 	try {
 		const d = new Date(dateStr)
-		return d.toLocaleString('ru-RU', {
+		return d.toLocaleString(undefined, {
 			year: 'numeric',
 			month: '2-digit',
 			day: '2-digit',

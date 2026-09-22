@@ -6,17 +6,17 @@
 		@close="$emit('close')">
 		<form class="add-member-form" @submit.prevent="submitForm">
 			<h2 class="form-title">
-				Добавить участника
+				{{ t('Add member') }}
 			</h2>
 
 			<p class="form-description">
-				Выберите пользователей для добавления в группу «{{ group.name }}».
+				{{ t('Select users to add to group "{group}".', { group: group.name }) }}
 			</p>
 
 			<!-- Selected Users to Add Section -->
 			<div class="form-group">
 				<label class="form-label">
-					Участники к добавлению ({{ selectedUsers.length }})
+					{{ t('Members to add ({count})', { count: selectedUsers.length }) }}
 				</label>
 
 				<!-- Selected users list with scroll and max height -->
@@ -35,25 +35,25 @@
 							size="small"
 							:disabled="saving"
 							@click="removeSelected(user.uid)">
-							- Удалить
+							- {{ t('Remove') }}
 						</NcButton>
 					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					Участники еще не выбраны. Выберите пользователей из списка ниже.
+					{{ t('No members selected yet. Choose users from the list below.') }}
 				</div>
 
 				<!-- Search input for available users -->
 				<div class="search-user-wrapper">
 					<NcTextField
 						v-model="userSearchQuery"
-						placeholder="Поиск пользователей Nextcloud для добавления..."
+						:placeholder="t('Search Nextcloud users to add...')"
 						:disabled="saving" />
 				</div>
 
 				<!-- Available users list -->
 				<div v-if="loadingUsers" class="loading-users">
-					<NcLoadingIcon :size="20" /> Загрузка пользователей...
+					<NcLoadingIcon :size="20" /> {{ t('Loading users...') }}
 				</div>
 				<div v-else-if="filteredAvailableUsers.length > 0" class="available-users-list">
 					<div
@@ -71,12 +71,12 @@
 							size="small"
 							:disabled="saving"
 							@click.stop="addSelected(user)">
-							+ Добавить
+							+ {{ t('Add') }}
 						</NcButton>
 					</div>
 				</div>
 				<div v-else class="empty-users">
-					{{ userSearchQuery.trim() !== '' ? 'Пользователи не найдены по запросу' : 'Все доступные пользователи уже добавлены в группу' }}
+					{{ userSearchQuery.trim() !== '' ? t('No users found for query') : t('All available users are already added to the group') }}
 				</div>
 			</div>
 
@@ -87,13 +87,13 @@
 					variant="secondary"
 					:disabled="saving"
 					@click="$emit('close')">
-					Отмена
+					{{ t('Cancel') }}
 				</NcButton>
 				<NcButton
 					type="submit"
 					variant="primary"
 					:disabled="saving || selectedUsers.length === 0">
-					{{ saving ? 'Сохранение...' : 'Сохранить' }}
+					{{ saving ? t('Saving...') : t('Save') }}
 				</NcButton>
 			</div>
 		</form>
@@ -110,6 +110,7 @@ import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import type { CustomGroup, UserOption } from '../types'
+import { t } from '../utils/l10n'
 
 const props = defineProps<{
 	show: boolean
@@ -195,12 +196,12 @@ async function submitForm() {
 			memberIds: allMemberIds,
 		})
 
-		showSuccess('Участники успешно добавлены в группу')
+		showSuccess(t('Members successfully added to group'))
 		emit('saved')
 		emit('close')
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при добавлении участников'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error adding members')
 		showError(msg)
 	} finally {
 		saving.value = false

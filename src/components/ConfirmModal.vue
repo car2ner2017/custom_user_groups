@@ -14,14 +14,14 @@
 					variant="secondary"
 					:disabled="loading"
 					@click="$emit('close')">
-					Отмена
+					{{ t('Cancel') }}
 				</NcButton>
 				<NcButton
 					type="button"
 					variant="error"
 					:disabled="loading"
 					@click="$emit('confirm')">
-					{{ confirmText || 'Удалить' }}
+					{{ confirmText || t('Delete') }}
 				</NcButton>
 			</div>
 		</div>
@@ -31,6 +31,7 @@
 <script setup lang="ts">
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
+import { t } from '../utils/l10n'
 
 defineProps<{
 	show: boolean

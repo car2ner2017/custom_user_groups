@@ -55,7 +55,7 @@ class NavigationListener implements IEventListener {
 			'order' => 10,
 			'href' => $this->urlGenerator->linkToRoute('customusergroups.page.index'),
 			'icon' => $this->urlGenerator->imagePath(Application::APP_ID, 'app-dark.svg'),
-			'name' => $this->l->t('Пользовательские группы'),
+			'name' => $this->l->t('Custom user groups'),
 			'type' => INavigationManager::TYPE_APPS,
 			'app' => Application::APP_ID,
 		]);

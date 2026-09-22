@@ -6,22 +6,22 @@
 		@close="$emit('close')">
 		<form class="group-form" @submit.prevent="submitForm">
 			<h2 class="form-title">
-				{{ isEdit ? 'Редактировать группу' : 'Создать новую группу' }}
+				{{ isEdit ? t('Edit group') : t('Create new group') }}
 			</h2>
 
 			<!-- Group Name Field -->
 			<div class="form-group">
 				<label for="group-name" class="form-label">
-					Название группы <span class="required">*</span>
+					{{ t('Group name') }} <span class="required">*</span>
 				</label>
 				<NcTextField
 					id="group-name"
 					v-model="name"
-					placeholder="Например, Команда проекта или Бухгалтерия"
+					:placeholder="t('e.g. Project team or Accounting')"
 					:disabled="loading || !canEditName"
 					required />
 				<small v-if="isEdit && !canEditName" class="help-text text-warning">
-					Переименование группы доступно только создателю, администратору или управляющему.
+					{{ t('Renaming the group is only available to the creator, administrator or manager.') }}
 				</small>
 			</div>
 
@@ -31,17 +31,17 @@
 					v-model="isSelfSelected"
 					type="checkbox"
 					:disabled="loading">
-					Добавить себя как участника группы
+					{{ t('Add myself as a group member') }}
 				</NcCheckboxRadioSwitch>
 			</div>
 
 			<!-- Group Owner Field (Transfer ownership) -->
 			<div v-if="isEdit && canTransferOwnership" class="form-group">
 				<label for="group-owner" class="form-label">
-					Передать владение группой
+					{{ t('Transfer group ownership') }}
 				</label>
 				<div class="current-owner-info">
-					Текущий владелец: <strong>{{ currentOwnerDisplayName }}</strong> <span v-if="currentOwnerEmail">({{ currentOwnerEmail }})</span>
+					{{ t('Current owner:') }} <strong>{{ currentOwnerDisplayName }}</strong> <span v-if="currentOwnerEmail">({{ currentOwnerEmail }})</span>
 				</div>
 				<select
 					id="group-owner"
@@ -49,14 +49,14 @@
 					class="owner-select"
 					:disabled="loading">
 					<option value="">
-						-- Без изменений --
+						-- {{ t('No change') }} --
 					</option>
 					<option
 						v-for="user in selectedUsers"
 						:key="user.uid"
 						:value="user.uid"
 						:disabled="user.uid === currentOwnerUid">
-						{{ user.displayName }} ({{ user.email || ('@' + user.uid) }}){{ user.uid === currentOwnerUid ? ' (Текущий владелец)' : '' }}
+						{{ user.displayName }} ({{ user.email || ('@' + user.uid) }}){{ user.uid === currentOwnerUid ? ' (' + t('Current owner') + ')' : '' }}
 					</option>
 				</select>
 			</div>
@@ -64,14 +64,14 @@
 			<!-- Selected Group Members Section -->
 			<div class="form-group">
 				<label class="form-label">
-					Участники группы ({{ selectedUsers.length }})
+					{{ t('Group members') }} ({{ selectedUsers.length }})
 				</label>
 
 				<!-- Filter input for already selected members (only in edit mode) -->
 				<div v-if="isEdit && selectedUsers.length > 0" class="filter-selected-wrapper">
 					<NcTextField
 						v-model="selectedMembersFilter"
-						placeholder="Поиск участников группы (по имени, email или логину)..."
+						:placeholder="t('Search group members (by name, email or username)…')"
 						size="small"
 						:disabled="loading" />
 				</div>
@@ -92,32 +92,32 @@
 							size="small"
 							:disabled="loading"
 							@click.stop="removeUser(user.uid)">
-							- Удалить
+							- {{ t('Remove') }}
 						</NcButton>
 					</div>
 					<div v-if="filteredSelectedUsers.length === 0" class="no-filtered-selected">
-						По запросу «{{ selectedMembersFilter }}» участники не найдены
+						{{ t('No members found matching "{query}"', { query: selectedMembersFilter }) }}
 					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					Участники еще не выбраны. Добавьте их из списка ниже.
+					{{ t('No members selected yet. Add them from the list below.') }}
 				</div>
 
 				<label v-if="isEdit" class="form-label">
-					Добавить участника
+					{{ t('Add member') }}
 				</label>
 
 				<!-- Search users input for adding new members -->
 				<div class="search-user-wrapper">
 					<NcTextField
 						v-model="userSearchQuery"
-						placeholder="Поиск пользователей Nextcloud для добавления..."
+						:placeholder="t('Search Nextcloud users to add…')"
 						:disabled="loading" />
 				</div>
 
 				<!-- Available users list -->
 				<div v-if="loadingUsers" class="loading-users">
-					<NcLoadingIcon :size="20" /> Загрузка пользователей...
+					<NcLoadingIcon :size="20" /> {{ t('Loading users…') }}
 				</div>
 				<div v-else-if="filteredAvailableUsers.length > 0" class="available-users-list">
 					<div
@@ -135,12 +135,12 @@
 							size="small"
 							:disabled="loading"
 							@click.stop="addUser(user)">
-							+ Добавить
+							+ {{ t('Add') }}
 						</NcButton>
 					</div>
 				</div>
 				<div v-else class="empty-users">
-					{{ userSearchQuery.trim() !== '' ? 'Пользователи не найдены по запросу' : 'Все доступные пользователи уже выбраны' }}
+					{{ userSearchQuery.trim() !== '' ? t('No users found matching query') : t('All available users are already selected') }}
 				</div>
 			</div>
 
@@ -151,13 +151,13 @@
 					variant="secondary"
 					:disabled="loading"
 					@click="$emit('close')">
-					Отмена
+					{{ t('Cancel') }}
 				</NcButton>
 				<NcButton
 					type="submit"
 					variant="primary"
 					:disabled="loading || name.trim() === '' || (isEdit && !hasChanges)">
-					{{ isEdit ? 'Сохранить изменения' : 'Создать группу' }}
+					{{ isEdit ? t('Save changes') : t('Create group') }}
 				</NcButton>
 			</div>
 		</form>
@@ -165,9 +165,9 @@
 		<!-- Self-removal Warning Modal -->
 		<ConfirmModal
 			:show="showSelfRemoveConfirm"
-			title="Предупреждение"
-			message="Внимание: вы удаляете себя из этой пользовательской группы. После удаления вы потеряете доступ к группе и делегированные права управления/модерации. Продолжить?"
-			confirm-text="Продолжить"
+			:title="t('Warning')"
+			:message="t('Warning: you are removing yourself from this custom group. After removal, you will lose access to the group and delegated management/moderation rights. Continue?')"
+			:confirm-text="t('Continue')"
 			@close="cancelSelfRemoval"
 			@confirm="confirmSelfRemoval" />
 	</NcModal>
@@ -183,6 +183,7 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import { t } from '../utils/l10n'
 import ConfirmModal from './ConfirmModal.vue'
 import type { CustomGroup, UserOption } from '../types'
 
@@ -413,7 +414,7 @@ function removeUser(uid: string) {
 
 async function submitForm() {
 	if (name.value.trim() === '') {
-		showError('Пожалуйста, введите название группы')
+		showError(t('Please enter a group name'))
 		return
 	}
 
@@ -429,14 +430,14 @@ async function submitForm() {
 			}
 			if (canTransferOwnership.value && selectedNewOwnerId.value && selectedNewOwnerId.value !== currentOwnerUid.value) {
 				if (!selectedUsers.value.some((u) => u.uid === selectedNewOwnerId.value)) {
-					showError('Выбранный новый владелец должен быть участником группы')
+					showError(t('The selected new owner must be a member of the group'))
 					loading.value = false
 					return
 				}
 				payload.newOwnerId = selectedNewOwnerId.value
 			}
 			const response = await axios.put(url, payload)
-			showSuccess('Группа успешно обновлена')
+			showSuccess(t('Group updated successfully'))
 			emit('saved', response.data)
 		} else {
 			const url = generateUrl('/apps/customusergroups/api/v1/groups')
@@ -444,13 +445,13 @@ async function submitForm() {
 				name: name.value.trim(),
 				memberIds,
 			})
-			showSuccess('Группа успешно создана')
+			showSuccess(t('Group created successfully'))
 			emit('saved', response.data)
 		}
 		emit('close')
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Произошла ошибка при сохранении группы'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('An error occurred while saving the group')
 		showError(msg)
 	} finally {
 		loading.value = false

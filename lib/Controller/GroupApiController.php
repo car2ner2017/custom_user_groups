@@ -27,6 +27,7 @@ use OCP\Group\Events\UserAddedEvent;
 use OCP\Group\Events\UserRemovedEvent;
 use OCP\IGroup;
 use OCP\IGroupManager;
+use OCP\IL10N;
 use OCP\IRequest;
 use OCP\IUser;
 use OCP\IUserManager;
@@ -50,16 +51,21 @@ class GroupApiController extends Controller {
 		private IEventDispatcher $eventDispatcher,
 		private IManager $shareManager,
 		private ?string $userId,
+		private ?IL10N $l10n = null,
 	) {
 		parent::__construct($appName, $request);
 	}
 
+	private function t(string $text, array $parameters = []): string {
+		return $this->l10n !== null ? $this->l10n->t($text, $parameters) : (empty($parameters) ? $text : vsprintf($text, $parameters));
+	}
+
 	private function checkAccess(): ?JSONResponse {
 		if ($this->userId === null) {
-			return new JSONResponse(['error' => 'Authentication required'], Http::STATUS_UNAUTHORIZED);
+			return new JSONResponse(['error' => $this->t('Authentication required')], Http::STATUS_UNAUTHORIZED);
 		}
 		if (!$this->settingsService->isUserAccessAllowed($this->userId)) {
-			return new JSONResponse(['error' => 'Доступ к приложению ограничен администратором'], Http::STATUS_FORBIDDEN);
+			return new JSONResponse(['error' => $this->t('Application access is restricted by administrator')], Http::STATUS_FORBIDDEN);
 		}
 		return null;
 	}
@@ -70,7 +76,7 @@ class GroupApiController extends Controller {
 			return $authErr;
 		}
 		if (!$this->groupManager->isAdmin((string)$this->userId)) {
-			return new JSONResponse(['error' => 'Доступ разрешен только администраторам системы'], Http::STATUS_FORBIDDEN);
+			return new JSONResponse(['error' => $this->t('Access allowed only for system administrators')], Http::STATUS_FORBIDDEN);
 		}
 		return null;
 	}
@@ -108,14 +114,14 @@ class GroupApiController extends Controller {
 
 		if (!$this->settingsService->canUserCreateGroups($this->userId)) {
 			return new JSONResponse(
-				['error' => 'Создание пользовательских групп ограничено администратором'],
+				['error' => $this->t('Creation of custom groups is restricted by administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
 		$name = trim($name);
 		if ($name === '') {
-			return new JSONResponse(['error' => 'Название группы не может быть пустым'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Group name cannot be empty')], Http::STATUS_BAD_REQUEST);
 		}
 
 		// Filter valid users in Nextcloud
@@ -141,7 +147,7 @@ class GroupApiController extends Controller {
 			$this->mapper->createGroup($finalGid, $name, (string)$this->userId, $validMemberIds, new DateTime());
 			$created = $this->mapper->getGroupDetails($finalGid);
 			if ($created === null) {
-				return new JSONResponse(['error' => 'Не удалось создать группу'], Http::STATUS_INTERNAL_SERVER_ERROR);
+				return new JSONResponse(['error' => $this->t('Failed to create group')], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
 			// Nextcloud Audit log
@@ -178,12 +184,12 @@ class GroupApiController extends Controller {
 
 		$existing = $this->mapper->getGroupDetails($groupId);
 		if ($existing === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$name = trim($name);
 		if ($name === '') {
-			return new JSONResponse(['error' => 'Название группы не может быть пустым'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Group name cannot be empty')], Http::STATUS_BAD_REQUEST);
 		}
 
 		$currentUid = (string)$this->userId;
@@ -196,7 +202,7 @@ class GroupApiController extends Controller {
 		// Permission check for modifying group
 		if (!$canModerate) {
 			return new JSONResponse(
-				['error' => 'У вас нет прав для изменения этой группы'],
+				['error' => $this->t('You do not have permission to modify this group')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -204,7 +210,7 @@ class GroupApiController extends Controller {
 		$nameChanged = ($existing['name'] !== $name);
 		if ($nameChanged && !$canManage) {
 			return new JSONResponse(
-				['error' => 'Изменение названия группы доступно только создателю, администратору или управляющему'],
+				['error' => $this->t('Changing group name is only allowed for creator, administrator, or manager')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -224,21 +230,21 @@ class GroupApiController extends Controller {
 		if ($transferOwnership) {
 			if (!$isOwner && !$isAdmin) {
 				return new JSONResponse(
-					['error' => 'Передача владения доступна только текущему владельцу группы или администратору'],
+					['error' => $this->t('Ownership transfer is only allowed for the current group owner or administrator')],
 					Http::STATUS_FORBIDDEN
 				);
 			}
 
 			if (!$this->userManager->userExists($newOwnerId)) {
 				return new JSONResponse(
-					['error' => 'Указанный новый владелец не найден в системе'],
+					['error' => $this->t('Specified new owner was not found in the system')],
 					Http::STATUS_BAD_REQUEST
 				);
 			}
 
 			if (!in_array($newOwnerId, $validMemberIds, true)) {
 				return new JSONResponse(
-					['error' => 'Новый владелец должен быть участником группы'],
+					['error' => $this->t('New owner must be a member of the group')],
 					Http::STATUS_BAD_REQUEST
 				);
 			}
@@ -253,7 +259,7 @@ class GroupApiController extends Controller {
 			$this->mapper->updateGroup($groupId, $name, $validMemberIds, $finalOwnerId);
 			$updated = $this->mapper->getGroupDetails($groupId);
 			if ($updated === null) {
-				return new JSONResponse(['error' => 'Не удалось обновить группу'], Http::STATUS_INTERNAL_SERVER_ERROR);
+				return new JSONResponse(['error' => $this->t('Failed to update group')], Http::STATUS_INTERNAL_SERVER_ERROR);
 			}
 
 			// Audit logs (system audit + group activity)
@@ -268,7 +274,7 @@ class GroupApiController extends Controller {
 				$this->delegationMapper->removeDelegation($groupId, $newOwnerId);
 				$this->auditService->auditOwnershipTransferred(
 					$groupId,
-					$name,
+					$existing['name'],
 					$currentOwnerId,
 					$newOwnerId,
 					$currentUid
@@ -279,20 +285,13 @@ class GroupApiController extends Controller {
 				]);
 			}
 			foreach ($toRemove as $uid) {
-				$del = $this->delegationMapper->getDelegation($groupId, $uid);
-				if ($del !== null) {
-					$this->delegationMapper->removeDelegation($groupId, $uid);
-					$this->auditService->auditDelegationRevoked($groupId, $name, $uid, $del->getLevel(), $currentUid);
-					$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_DELEGATION_REVOKE, $currentUid, $uid, [
-						'level' => $del->getLevel(),
-						'reason' => 'member_removed',
-					]);
-				}
-				$this->auditService->auditMemberRemoved($groupId, $name, $uid, $currentUid);
+				// Clean up any delegations if a user is removed from group
+				$this->delegationMapper->removeDelegation($groupId, $uid);
+				$this->auditService->auditMemberRemoved($groupId, $existing['name'], $uid, $currentUid);
 				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_REMOVE, $currentUid, $uid);
 			}
 			foreach ($toAdd as $uid) {
-				$this->auditService->auditMemberAdded($groupId, $name, $uid, $currentUid);
+				$this->auditService->auditMemberAdded($groupId, $existing['name'], $uid, $currentUid);
 				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $uid);
 			}
 
@@ -331,7 +330,7 @@ class GroupApiController extends Controller {
 
 		$existing = $this->mapper->getGroupDetails($groupId);
 		if ($existing === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
@@ -341,22 +340,22 @@ class GroupApiController extends Controller {
 
 		if (!$isOwner && !$isAdmin) {
 			return new JSONResponse(
-				['error' => 'Передача владения доступна только текущему владельцу группы или администратору'],
+				['error' => $this->t('Ownership transfer is only allowed for the current group owner or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
 		$newOwnerId = trim($newOwnerId);
 		if ($newOwnerId === '' || !$this->userManager->userExists($newOwnerId)) {
-			return new JSONResponse(['error' => 'Указанный новый владелец не найден в системе'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Specified new owner was not found in the system')], Http::STATUS_BAD_REQUEST);
 		}
 
 		if (!$this->mapper->isMember($groupId, $newOwnerId)) {
-			return new JSONResponse(['error' => 'Новый владелец должен быть действующим участником группы'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('New owner must be an active member of the group')], Http::STATUS_BAD_REQUEST);
 		}
 
 		if ($newOwnerId === $currentOwnerId) {
-			return new JSONResponse(['error' => 'Пользователь уже является владельцем этой группы'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('User is already the owner of this group')], Http::STATUS_BAD_REQUEST);
 		}
 
 		try {
@@ -393,14 +392,14 @@ class GroupApiController extends Controller {
 
 		$existing = $this->mapper->getGroupDetails($groupId);
 		if ($existing === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		// Only creator, admin, or manage level can delete group
 		if (!$this->canManageGroup($existing, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Удаление группы доступно только создателю, администратору или управляющему'],
+				['error' => $this->t('Deleting group is only allowed for creator, administrator, or manager')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -458,7 +457,7 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$delegations = $this->fetchEnrichedDelegations($groupId);
@@ -474,13 +473,13 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Делегирование прав доступно только владельцу группы, управляющему или администратору'],
+				['error' => $this->t('Delegation is only allowed for group owner, manager, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -495,7 +494,7 @@ class GroupApiController extends Controller {
 		if ($isManagerOnly) {
 			if ($level !== CustomGroupDelegation::LEVEL_MODERATE) {
 				return new JSONResponse(
-					['error' => 'Управляющий может назначать права только с ролью «Модератор»'],
+					['error' => $this->t('Manager can only assign rights with Moderator role')],
 					Http::STATUS_FORBIDDEN
 				);
 			}
@@ -503,7 +502,7 @@ class GroupApiController extends Controller {
 			$existing = $this->delegationMapper->getDelegation($groupId, $userId);
 			if ($existing !== null && $existing->getLevel() === CustomGroupDelegation::LEVEL_MANAGE) {
 				return new JSONResponse(
-					['error' => 'Управляющий не может изменять права других управляющих'],
+					['error' => $this->t('Manager cannot change rights of other managers')],
 					Http::STATUS_FORBIDDEN
 				);
 			}
@@ -512,7 +511,7 @@ class GroupApiController extends Controller {
 		// Strictly only active members of this group can be delegates
 		if (!$this->mapper->isMember($groupId, $userId)) {
 			return new JSONResponse(
-				['error' => 'Делегирование прав возможно только действующим участникам группы'],
+				['error' => $this->t('Delegation is only allowed for active group members')],
 				Http::STATUS_BAD_REQUEST
 			);
 		}
@@ -521,14 +520,14 @@ class GroupApiController extends Controller {
 		$currentOwnerId = $group['owner_id'] ?? $group['creator_id'];
 		if ($userId === $currentOwnerId) {
 			return new JSONResponse(
-				['error' => 'Владелец группы уже обладает всеми правами управления'],
+				['error' => $this->t('Group owner already has all management rights')],
 				Http::STATUS_BAD_REQUEST
 			);
 		}
 
 		if (!in_array($level, [CustomGroupDelegation::LEVEL_MANAGE, CustomGroupDelegation::LEVEL_MODERATE], true)) {
 			return new JSONResponse(
-				['error' => 'Некорректный уровень делегирования прав'],
+				['error' => $this->t('Invalid delegation level')],
 				Http::STATUS_BAD_REQUEST
 			);
 		}
@@ -570,13 +569,13 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageDelegations($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Отзыв прав доступен только владельцу группы, управляющему или администратору'],
+				['error' => $this->t('Revoking rights is only allowed for group owner, manager, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -591,7 +590,7 @@ class GroupApiController extends Controller {
 		if ($existing !== null) {
 			if ($isManagerOnly && $existing->getLevel() !== CustomGroupDelegation::LEVEL_MODERATE) {
 				return new JSONResponse(
-					['error' => 'Управляющий может отзывать права только у модераторов'],
+					['error' => $this->t('Manager can only revoke rights from moderators')],
 					Http::STATUS_FORBIDDEN
 				);
 			}
@@ -619,13 +618,13 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Просмотр заявок доступен только модераторам, управляющим или администратору'],
+				['error' => $this->t('Viewing requests is only allowed for moderators, managers, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -645,28 +644,28 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$candidateId = trim($candidateId);
 		if ($candidateId === '' || !$this->userManager->userExists($candidateId)) {
-			return new JSONResponse(['error' => 'Указанный пользователь не найден'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Specified user was not found')], Http::STATUS_BAD_REQUEST);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canRequestMember($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Предлагать участников могут только действующие члены группы, создатель или администратор'],
+				['error' => $this->t('Suggesting members is only allowed for active group members, creator, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
 		if ($this->mapper->isMember($groupId, $candidateId)) {
-			return new JSONResponse(['error' => 'Пользователь уже является участником группы'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('User is already a member of the group')], Http::STATUS_BAD_REQUEST);
 		}
 
 		if ($this->requestMapper->hasActiveRequest($groupId, $candidateId)) {
-			return new JSONResponse(['error' => 'Заявка на добавление этого пользователя уже находится на рассмотрении'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('A request to add this user is already pending')], Http::STATUS_BAD_REQUEST);
 		}
 
 		// If requester has Moderate/Manage permission or is Creator/Admin, auto-add directly!
@@ -703,24 +702,24 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Одобрение заявок доступно только модераторам, управляющим или администратору'],
+				['error' => $this->t('Approving requests is only allowed for moderators, managers, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
 		$request = $this->requestMapper->getRequest($requestId);
 		if ($request === null || $request->getGroupId() !== $groupId) {
-			return new JSONResponse(['error' => 'Заявка не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Request not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		if ($request->getStatus() !== CustomGroupRequest::STATUS_PENDING) {
-			return new JSONResponse(['error' => 'Заявка уже была обработана ранее'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Request has already been processed')], Http::STATUS_BAD_REQUEST);
 		}
 
 		$candidateId = (string)$request->getCandidateId();
@@ -757,24 +756,24 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canModerateGroup($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Отклонение заявок доступно только модераторам, управляющим или администратору'],
+				['error' => $this->t('Rejecting requests is only allowed for moderators, managers, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
 
 		$request = $this->requestMapper->getRequest($requestId);
 		if ($request === null || $request->getGroupId() !== $groupId) {
-			return new JSONResponse(['error' => 'Заявка не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Request not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		if ($request->getStatus() !== CustomGroupRequest::STATUS_PENDING) {
-			return new JSONResponse(['error' => 'Заявка уже была обработана ранее'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Request has already been processed')], Http::STATUS_BAD_REQUEST);
 		}
 
 		$candidateId = (string)$request->getCandidateId();
@@ -946,7 +945,7 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
@@ -957,7 +956,7 @@ class GroupApiController extends Controller {
 
 		if (!$isOwner && !$isAdmin && $delegationLevel !== CustomGroupDelegation::LEVEL_MANAGE) {
 			return new JSONResponse(
-				['error' => 'Просмотр истории действий доступен только владельцу группы, управляющему или администратору'],
+				['error' => $this->t('Viewing activity log is only allowed for group owner, manager, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -978,7 +977,7 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$ownerId = $group['owner_id'] ?? $group['creator_id'];
@@ -986,7 +985,7 @@ class GroupApiController extends Controller {
 		$isOwner = ($ownerId === $currentUid);
 
 		if (!$isAdmin && !$isOwner && !$isMember) {
-			return new JSONResponse(['error' => 'Доступ запрещен'], Http::STATUS_FORBIDDEN);
+			return new JSONResponse(['error' => $this->t('Access denied')], Http::STATUS_FORBIDDEN);
 		}
 
 		return new JSONResponse(['group' => $this->enrichGroup($group, $isAdmin)]);
@@ -1001,13 +1000,13 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageGroupShares($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Просмотр ресурсов группы доступен только владельцу группы, управляющему или администратору'],
+				['error' => $this->t('Viewing group resources is only allowed for group owner, manager, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -1028,7 +1027,7 @@ class GroupApiController extends Controller {
 				$cleanPath = substr($cleanPath, 6);
 			}
 
-			$name = $s['file_name'] ?: basename($s['file_target'] ?: 'Ресурс');
+			$name = $s['file_name'] ?: basename($s['file_target'] ?: 'resource');
 
 			$shares[] = [
 				'id' => $s['id'],
@@ -1060,13 +1059,13 @@ class GroupApiController extends Controller {
 
 		$group = $this->mapper->getGroupDetails($groupId);
 		if ($group === null) {
-			return new JSONResponse(['error' => 'Группа не найдена'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Group not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		$currentUid = (string)$this->userId;
 		if (!$this->canManageGroupShares($group, $currentUid)) {
 			return new JSONResponse(
-				['error' => 'Отзыв доступа к ресурсу доступен только владельцу группы, управляющему или администратору'],
+				['error' => $this->t('Revoking resource access is only allowed for group owner, manager, or administrator')],
 				Http::STATUS_FORBIDDEN
 			);
 		}
@@ -1074,11 +1073,11 @@ class GroupApiController extends Controller {
 		try {
 			$share = $this->resolveShare($shareId);
 		} catch (ShareNotFound|Exception) {
-			return new JSONResponse(['error' => 'Ресурс общего доступа не найден'], Http::STATUS_NOT_FOUND);
+			return new JSONResponse(['error' => $this->t('Shared resource not found')], Http::STATUS_NOT_FOUND);
 		}
 
 		if ($share->getShareType() !== IShare::TYPE_GROUP || $share->getSharedWith() !== $groupId) {
-			return new JSONResponse(['error' => 'Указанный ресурс не связан с данной группой'], Http::STATUS_BAD_REQUEST);
+			return new JSONResponse(['error' => $this->t('Specified resource is not associated with this group')], Http::STATUS_BAD_REQUEST);
 		}
 
 		$nodeName = '';
@@ -1087,10 +1086,10 @@ class GroupApiController extends Controller {
 			$node = $share->getNode();
 			$nodeName = $node ? $node->getName() : '';
 		} catch (\Throwable) {
-			$nodeName = $share->getTarget() ?: 'ресурс';
+			$nodeName = $share->getTarget() ?: 'resource';
 		}
 		if ($nodeName === '') {
-			$nodeName = $share->getTarget() ?: 'ресурс';
+			$nodeName = $share->getTarget() ?: 'resource';
 		}
 
 		$ownerId = $share->getShareOwner();
@@ -1099,7 +1098,7 @@ class GroupApiController extends Controller {
 		try {
 			$this->shareManager->deleteShare($share);
 		} catch (Exception $e) {
-			return new JSONResponse(['error' => 'Не удалось отозвать доступ: ' . $e->getMessage()], Http::STATUS_INTERNAL_SERVER_ERROR);
+			return new JSONResponse(['error' => $this->t('Failed to revoke access: %s', [$e->getMessage()])], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
 		// Log activity in group audit trail

@@ -6,7 +6,7 @@
 		@close="$emit('close')">
 		<div class="history-modal-content">
 			<h2 class="form-title">
-				История запросов группы «{{ group.name }}»
+				{{ t('Request history for group "{name}"', { name: group.name }) }}
 			</h2>
 
 			<div class="filters-bar">
@@ -16,40 +16,40 @@
 						class="tab-button"
 						:class="{ active: statusFilter === 'all' }"
 						@click="statusFilter = 'all'">
-						Все ({{ processedRequests.length }})
+						{{ t('All') }} ({{ processedRequests.length }})
 					</button>
 					<button
 						type="button"
 						class="tab-button tab-approved"
 						:class="{ active: statusFilter === 'approved' }"
 						@click="statusFilter = 'approved'">
-						Одобренные ({{ countApproved }})
+						{{ t('Approved') }} ({{ countApproved }})
 					</button>
 					<button
 						type="button"
 						class="tab-button tab-rejected"
 						:class="{ active: statusFilter === 'rejected' }"
 						@click="statusFilter = 'rejected'">
-						Отклоненные ({{ countRejected }})
+						{{ t('Rejected') }} ({{ countRejected }})
 					</button>
 				</div>
 
 				<div class="search-input-wrapper">
 					<NcTextField
 						v-model="searchFilter"
-						placeholder="Поиск по кандидату, автору или решению..."
+						:placeholder="t('Search by candidate, author or decision…')"
 						size="small" />
 				</div>
 			</div>
 
 			<div v-if="loading" class="loading-state">
-				<NcLoadingIcon :size="24" /> Загрузка истории запросов...
+				<NcLoadingIcon :size="24" /> {{ t('Loading request history…') }}
 			</div>
 			<div v-else-if="processedRequests.length === 0" class="empty-state">
-				В этой группе еще не было рассмотренных запросов на добавление участников.
+				{{ t('There are no reviewed membership requests in this group yet.') }}
 			</div>
 			<div v-else-if="filteredRequests.length === 0" class="empty-state">
-				Запросы не найдены по заданным критериям фильтрации.
+				{{ t('No requests found matching the filter criteria.') }}
 			</div>
 			<div v-else class="requests-history-list">
 				<div
@@ -63,13 +63,13 @@
 							<span class="candidate-email">{{ req.candidate_email || ('@' + req.candidate_id) }}</span>
 						</div>
 						<div class="status-tag" :class="'tag-' + req.status">
-							{{ req.status === 'approved' ? 'Одобрен' : 'Отклонен' }}
+							{{ req.status === 'approved' ? t('Approved') : t('Rejected') }}
 						</div>
 					</div>
 
 					<div class="card-details">
 						<div class="detail-row">
-							<span class="detail-label">Предложил:</span>
+							<span class="detail-label">{{ t('Suggested by:') }}</span>
 							<span class="detail-value">
 								{{ req.requester_displayName }} ({{ '@' + req.requester_id }})
 							</span>
@@ -78,10 +78,10 @@
 
 						<div class="detail-row decision-row">
 							<span class="detail-label">
-								{{ req.status === 'approved' ? 'Одобрил:' : 'Отклонил:' }}
+								{{ req.status === 'approved' ? t('Approved by:') : t('Rejected by:') }}
 							</span>
 							<span class="detail-value font-semibold">
-								{{ req.processed_by_displayName || req.processed_by || 'Администратор' }}
+								{{ req.processed_by_displayName || req.processed_by || t('Administrator') }}
 								<span v-if="req.processed_by_email || req.processed_by" class="detail-sub">
 									({{ req.processed_by_email || ('@' + req.processed_by) }})
 								</span>
@@ -96,7 +96,7 @@
 				<NcButton
 					type="secondary"
 					@click="$emit('close')">
-					Закрыть
+					{{ t('Close') }}
 				</NcButton>
 			</div>
 		</div>
@@ -111,6 +111,7 @@ import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
+import { t } from '../utils/l10n'
 import type { CustomGroup, MembershipRequest } from '../types'
 
 const props = defineProps<{

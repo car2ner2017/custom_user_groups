@@ -7,6 +7,7 @@ namespace OCA\CustomUserGroups\Db;
 use DateTime;
 use OCP\AppFramework\Db\QBMapper;
 use OCP\IDBConnection;
+use OCP\IL10N;
 use OCP\IUserManager;
 use OCP\IUser;
 
@@ -18,6 +19,7 @@ class CustomGroupActivityMapper extends QBMapper {
 	public function __construct(
 		IDBConnection $db,
 		private IUserManager $userManager,
+		private IL10N $l10n,
 	) {
 		parent::__construct($db, 'custom_user_group_activity', CustomGroupActivity::class);
 	}
@@ -124,46 +126,50 @@ class CustomGroupActivityMapper extends QBMapper {
 	private function formatDescription(string $actionType, ?string $targetName, ?array $details): string {
 		switch ($actionType) {
 			case CustomGroupActivity::ACTION_MEMBER_ADD:
-				return $targetName ? "Добавлен участник $targetName" : 'Добавлен новый участник';
+				return $targetName
+					? $this->l10n->t('Added member %s', [$targetName])
+					: $this->l10n->t('Added new member');
 
 			case CustomGroupActivity::ACTION_MEMBER_REMOVE:
-				return $targetName ? "Удален участник $targetName" : 'Удален участник';
+				return $targetName
+					? $this->l10n->t('Removed member %s', [$targetName])
+					: $this->l10n->t('Removed member');
 
 			case CustomGroupActivity::ACTION_DELEGATION_ASSIGN:
 				$level = $details['level'] ?? '';
-				$levelText = $level === 'manage' ? '«Управление»' : ($level === 'moderate' ? '«Модерация»' : '');
+				$levelText = $level === 'manage' ? $this->l10n->t('«Manage»') : ($level === 'moderate' ? $this->l10n->t('«Moderate»') : '');
 				return $targetName
-					? "Назначены права $levelText участнику $targetName"
-					: "Назначены права делегирования $levelText";
+					? $this->l10n->t('Assigned rights %s to member %s', [$levelText, $targetName])
+					: $this->l10n->t('Assigned delegation rights %s', [$levelText]);
 
 			case CustomGroupActivity::ACTION_DELEGATION_REVOKE:
 				return $targetName
-					? "Отозваны права управления у участника $targetName"
-					: 'Отозваны права управления';
+					? $this->l10n->t('Revoked management rights from member %s', [$targetName])
+					: $this->l10n->t('Revoked management rights');
 
 			case CustomGroupActivity::ACTION_NAME_CHANGE:
 				$newName = $details['new_name'] ?? '';
 				$oldName = $details['old_name'] ?? '';
 				if ($oldName !== '' && $newName !== '') {
-					return "Название группы изменено с «{$oldName}» на «{$newName}»";
+					return $this->l10n->t('Group name changed from «%s» to «%s»', [$oldName, $newName]);
 				}
-				return $newName !== '' ? "Группа переименована в «{$newName}»" : 'Изменено название группы';
+				return $newName !== '' ? $this->l10n->t('Group renamed to «%s»', [$newName]) : $this->l10n->t('Group name changed');
 
 			case CustomGroupActivity::ACTION_OWNER_TRANSFER:
 				return $targetName
-					? "Владение группой передано участнику $targetName"
-					: 'Передано владение группой';
+					? $this->l10n->t('Group ownership transferred to member %s', [$targetName])
+					: $this->l10n->t('Group ownership transferred');
 
 			case CustomGroupActivity::ACTION_SHARE_UNSHARE:
 				$name = $details['name'] ?? '';
-				$itemType = ($details['item_type'] ?? '') === 'folder' ? 'папке' : 'файлу';
+				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
 				if ($name !== '') {
-					return "Отозван общий доступ к {$itemType} «{$name}» для группы";
+					return $this->l10n->t('Revoked group access to %s «%s»', [$itemType, $name]);
 				}
-				return 'Отозван общий доступ к ресурсу для группы';
+				return $this->l10n->t('Revoked group access to resource');
 
 			default:
-				return 'Действие с группой';
+				return $this->l10n->t('Group action');
 		}
 	}
 }

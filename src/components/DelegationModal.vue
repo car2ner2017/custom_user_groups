@@ -6,34 +6,34 @@
 		@close="$emit('close')">
 		<div class="delegation-modal-content">
 			<h2 class="form-title">
-				Делегирование прав управления группой
+				{{ t('Delegation of group management rights') }}
 			</h2>
 
 			<p class="delegation-description">
-				Вы можете делегировать права управления или модерации группы <strong>только действующим участникам</strong> этой группы.
+				{{ t('You can delegate group management or moderation rights only to active members of this group.') }}
 			</p>
 
 			<!-- Current Delegations Section -->
 			<div class="section-title">
-				<h3>Делегированные пользователи ({{ localDelegations.length }})</h3>
+				<h3>{{ t('Delegated users') }} ({{ localDelegations.length }})</h3>
 			</div>
 
 			<!-- Filter input for currently assigned delegates -->
 			<div v-if="localDelegations.length > 0" class="filter-delegates-wrapper">
 				<NcTextField
 					v-model="delegatesFilter"
-					placeholder="Поиск среди назначенных делегатов (по имени, email или логину)..."
+					:placeholder="t('Search assigned delegates (by name, email or username)…')"
 					size="small" />
 			</div>
 
 			<div v-if="loadingDelegations" class="loading-state">
-				<NcLoadingIcon :size="24" /> Загрузка делегатов...
+				<NcLoadingIcon :size="24" /> {{ t('Loading delegates…') }}
 			</div>
 			<div v-else-if="localDelegations.length === 0" class="empty-state">
-				В группе пока нет назначенных делегатов.
+				{{ t('No delegates assigned in this group yet.') }}
 			</div>
 			<div v-else-if="filteredDelegations.length === 0" class="empty-state">
-				По запросу «{{ delegatesFilter }}» назначенные делегаты не найдены.
+				{{ t('No delegates found matching "{query}"', { query: delegatesFilter }) }}
 			</div>
 			<div v-else class="delegates-list">
 				<div
@@ -48,20 +48,20 @@
 					<div class="delegate-actions">
 						<!-- If manager viewing another manager: only show static label, cannot change or revoke -->
 						<template v-if="isManagerOnly && del.level === 'manage'">
-							<span class="static-level-chip manage-chip">Управление</span>
+							<span class="static-level-chip manage-chip">{{ t('Manage') }}</span>
 						</template>
 
 						<!-- If manager viewing a moderator: show static label and revoke button -->
 						<template v-else-if="isManagerOnly && del.level === 'moderate'">
-							<span class="static-level-chip moderate-chip">Модерация</span>
+							<span class="static-level-chip moderate-chip">{{ t('Moderate') }}</span>
 							<NcButton
 								type="button"
 								variant="error"
 								size="small"
-								title="Отозвать права"
+								:title="t('Revoke rights')"
 								:disabled="saving"
 								@click="revoke(del.user_id)">
-								Отозвать
+								{{ t('Revoke') }}
 							</NcButton>
 						</template>
 
@@ -73,10 +73,10 @@
 								:disabled="saving"
 								@change="onLevelChange(del.user_id, ($event.target as HTMLSelectElement).value)">
 								<option value="manage">
-									Управление
+									{{ t('Manage') }}
 								</option>
 								<option value="moderate">
-									Модерация
+									{{ t('Moderate') }}
 								</option>
 							</select>
 
@@ -84,10 +84,10 @@
 								type="button"
 								variant="error"
 								size="small"
-								title="Отозвать права"
+								:title="t('Revoke rights')"
 								:disabled="saving"
 								@click="revoke(del.user_id)">
-								Отозвать
+								{{ t('Revoke') }}
 							</NcButton>
 						</template>
 					</div>
@@ -98,20 +98,20 @@
 
 			<!-- Assign Rights Section -->
 			<div class="section-title">
-				<h3>Делегирование</h3>
+				<h3>{{ t('Delegation') }}</h3>
 			</div>
 
 			<!-- Search filter for members -->
 			<div class="search-member-wrapper">
 				<NcTextField
 					v-model="memberSearchQuery"
-					placeholder="Поиск среди участников группы для назначения прав..."
+					:placeholder="t('Search group members to delegate rights…')"
 					:disabled="saving" />
 			</div>
 
 			<!-- Candidate Members List -->
 			<div v-if="filteredMembers.length === 0" class="empty-state">
-				{{ memberSearchQuery.trim() ? 'Участники не найдены по запросу «' + memberSearchQuery + '»' : 'В группе нет участников, доступных для делегирования' }}
+				{{ memberSearchQuery.trim() ? t('No members found matching "{query}"', { query: memberSearchQuery }) : t('No group members available for delegation') }}
 			</div>
 			<div v-else class="available-users-list">
 				<div
@@ -132,14 +132,14 @@
 							class="level-select"
 							:disabled="saving">
 							<option value="manage">
-								Управление
+								{{ t('Manage') }}
 							</option>
 							<option value="moderate">
-								Модерация
+								{{ t('Moderate') }}
 							</option>
 						</select>
 						<span v-else class="static-level-chip moderate-chip">
-							Модерация
+							{{ t('Moderate') }}
 						</span>
 
 						<NcButton
@@ -148,7 +148,7 @@
 							size="small"
 							:disabled="saving"
 							@click="assignRights(member)">
-							Делегировать
+							{{ t('Delegate') }}
 						</NcButton>
 					</div>
 				</div>
@@ -161,14 +161,14 @@
 					variant="secondary"
 					:disabled="saving"
 					@click="$emit('close')">
-					Отмена
+					{{ t('Cancel') }}
 				</NcButton>
 				<NcButton
 					type="button"
 					variant="primary"
 					:disabled="saving || loadingDelegations || !hasChanges"
 					@click="saveChanges">
-					{{ saving ? 'Сохранение...' : 'Сохранить' }}
+					{{ saving ? t('Saving…') : t('Save') }}
 				</NcButton>
 			</div>
 		</div>
@@ -184,6 +184,7 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import { t } from '../utils/l10n'
 import type { CustomGroup, Delegation, UserOption } from '../types'
 
 const props = defineProps<{
@@ -383,12 +384,12 @@ async function saveChanges() {
 		}
 
 		await Promise.all(promises)
-		showSuccess('Изменения успешно сохранены')
+		showSuccess(t('Changes saved successfully'))
 		emit('updated')
 		emit('close')
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка при сохранении изменений'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error saving changes')
 		showError(msg)
 	} finally {
 		saving.value = false

@@ -24,7 +24,7 @@ class AdminSection implements IIconSection {
 
 	#[\Override]
 	public function getName(): string {
-		return $this->l->t('Пользовательские группы');
+		return $this->l->t('Custom user groups');
 	}
 
 	#[\Override]

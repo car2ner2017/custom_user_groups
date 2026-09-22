@@ -2,23 +2,23 @@
 	<div class="admin-settings-container">
 		<!-- Section 1: Group Creation Restriction -->
 		<NcSettingsSection
-			name="Настройка пользовательских групп"
-			description="Настройте, кто имеет право создавать новые пользовательские группы в системе.">
+			:name="t('Custom user groups settings')"
+			:description="t('Configure who is allowed to create new custom user groups in the system.')">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
 					v-model="createRestrictionEnabled"
 					type="switch">
-					Ограничить создание групп (разрешить только выбранным пользователям и группам)
+					{{ t('Restrict group creation (allow only selected users and groups)') }}
 				</NcCheckboxRadioSwitch>
 
 				<div v-if="createRestrictionEnabled" class="restriction-details">
 					<div class="info-callout">
-						<strong>Примечание:</strong> Администраторы системы Nextcloud всегда имеют право создавать пользовательские группы, независимо от установленных ограничений.
+						<strong>{{ t('Note:') }}</strong> {{ t('Nextcloud administrators are always allowed to create custom groups regardless of restrictions.') }}
 					</div>
 
 					<!-- Allowed Users Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Разрешенные пользователи ({{ createAllowedUsers.length }})</label>
+						<label class="picker-label">{{ t('Allowed users') }} ({{ createAllowedUsers.length }})</label>
 
 						<!-- Selected users list -->
 						<div v-if="createAllowedUsersDetails.length > 0" class="selected-items-list">
@@ -35,19 +35,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeCreateUser(user.uid)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Пользователи пока не добавлены
+							{{ t('No users added yet') }}
 						</div>
 
 						<!-- Search users for creation -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="userSearchCreate"
-								placeholder="Поиск пользователей Nextcloud для добавления..."
+								:placeholder="t('Search Nextcloud users to add…')"
 								:disabled="saving" />
 						</div>
 
@@ -67,18 +67,18 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addCreateUser(user)">
-									+ Добавить
+									+ {{ t('Add') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ userSearchCreate.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи добавлены' }}
+							{{ userSearchCreate.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
 					</div>
 
 					<!-- Allowed Groups Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Разрешенные группы ({{ createAllowedGroups.length }})</label>
+						<label class="picker-label">{{ t('Allowed groups') }} ({{ createAllowedGroups.length }})</label>
 
 						<!-- Selected groups list -->
 						<div v-if="createAllowedGroupsDetails.length > 0" class="selected-items-list">
@@ -88,7 +88,7 @@
 								class="selected-item">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom group') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -96,19 +96,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeCreateGroup(grp.id)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Группы пока не добавлены
+							{{ t('No groups added yet') }}
 						</div>
 
 						<!-- Search groups for creation -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="groupSearchCreate"
-								placeholder="Поиск групп Nextcloud для добавления..."
+								:placeholder="t('Search Nextcloud groups to add…')"
 								:disabled="saving" />
 						</div>
 
@@ -121,7 +121,7 @@
 								@click="addCreateGroup(grp)">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -129,12 +129,12 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addCreateGroup(grp)">
-									+ Добавить
+									+ {{ t('Add') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ groupSearchCreate.trim() ? 'Группы не найдены' : 'Все доступные группы добавлены' }}
+							{{ groupSearchCreate.trim() ? t('No groups found') : t('All available groups have been added') }}
 						</div>
 					</div>
 				</div>
@@ -143,23 +143,23 @@
 
 		<!-- Section 2: App Access Restriction -->
 		<NcSettingsSection
-			name="Ограничение доступа к приложению"
-			description="Настройте правила доступа пользователей и групп к веб-интерфейсу «Пользовательские группы».">
+			:name="t('App access restriction')"
+			:description="t('Configure access rules for users and groups to the Custom User Groups web interface.')">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
 					v-model="accessRestrictionEnabled"
 					type="switch">
-					Ограничить доступ к приложению
+					{{ t('Restrict app access') }}
 				</NcCheckboxRadioSwitch>
 
 				<div v-if="accessRestrictionEnabled" class="restriction-details">
 					<div class="info-callout">
-						<strong>Примечание:</strong> Правила доступа применяются сверху вниз: если пользователю разрешено использовать приложение напрямую или через разрешенную группу, ему всегда предоставляется доступ (даже если он входит в запрещенную группу или указан в списке запрещенных). Администраторам доступ разрешен всегда.
+						<strong>{{ t('Note:') }}</strong> {{ t('Access rules are evaluated in order: if a user is explicitly allowed directly or via an allowed group, they are granted access (even if in a forbidden group). Administrators always have access.') }}
 					</div>
 
 					<!-- Allowed Users Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Разрешенные пользователи ({{ accessAllowedUsers.length }})</label>
+						<label class="picker-label">{{ t('Allowed users') }} ({{ accessAllowedUsers.length }})</label>
 
 						<!-- Selected allowed users list -->
 						<div v-if="accessAllowedUsersDetails.length > 0" class="selected-items-list">
@@ -176,19 +176,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeAccessAllowedUser(user.uid)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Пользователи пока не добавлены
+							{{ t('No users added yet') }}
 						</div>
 
 						<!-- Search users for access allow -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="userSearchAccessAllowed"
-								placeholder="Поиск пользователей для разрешения доступа..."
+								:placeholder="t('Search users to allow access…')"
 								:disabled="saving" />
 						</div>
 
@@ -208,18 +208,18 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addAccessAllowedUser(user)">
-									+ Разрешить
+									+ {{ t('Allow') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ userSearchAccessAllowed.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
+							{{ userSearchAccessAllowed.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
 					</div>
 
 					<!-- Allowed Groups Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Разрешенные группы ({{ accessAllowedGroups.length }})</label>
+						<label class="picker-label">{{ t('Allowed groups') }} ({{ accessAllowedGroups.length }})</label>
 
 						<!-- Selected allowed groups list -->
 						<div v-if="accessAllowedGroupsDetails.length > 0" class="selected-items-list">
@@ -229,7 +229,7 @@
 								class="selected-item">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom group') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -237,19 +237,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeAccessAllowedGroup(grp.id)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Группы пока не добавлены
+							{{ t('No groups added yet') }}
 						</div>
 
 						<!-- Search groups for access allow -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="groupSearchAccessAllowed"
-								placeholder="Поиск групп для разрешения доступа..."
+								:placeholder="t('Search groups to allow access…')"
 								:disabled="saving" />
 						</div>
 
@@ -262,7 +262,7 @@
 								@click="addAccessAllowedGroup(grp)">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -270,18 +270,18 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addAccessAllowedGroup(grp)">
-									+ Разрешить
+									+ {{ t('Allow') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ groupSearchAccessAllowed.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
+							{{ groupSearchAccessAllowed.trim() ? t('No groups found') : t('All available groups have been added') }}
 						</div>
 					</div>
 
 					<!-- Forbidden Users Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Запрещенные пользователи ({{ accessForbiddenUsers.length }})</label>
+						<label class="picker-label">{{ t('Forbidden users') }} ({{ accessForbiddenUsers.length }})</label>
 
 						<!-- Selected forbidden users list -->
 						<div v-if="accessForbiddenUsersDetails.length > 0" class="selected-items-list">
@@ -298,19 +298,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeAccessForbiddenUser(user.uid)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Пользователи пока не добавлены
+							{{ t('No users added yet') }}
 						</div>
 
 						<!-- Search users for access restriction -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="userSearchAccessForbidden"
-								placeholder="Поиск пользователей для ограничения доступа..."
+								:placeholder="t('Search users to forbid access…')"
 								:disabled="saving" />
 						</div>
 
@@ -330,18 +330,18 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addAccessForbiddenUser(user)">
-									+ Запретить
+									+ {{ t('Forbid') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ userSearchAccessForbidden.trim() ? 'Пользователи не найдены' : 'Все доступные пользователи уже добавлены' }}
+							{{ userSearchAccessForbidden.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
 					</div>
 
 					<!-- Forbidden Groups Selection -->
 					<div class="picker-group">
-						<label class="picker-label">Запрещенные группы ({{ accessForbiddenGroups.length }})</label>
+						<label class="picker-label">{{ t('Forbidden groups') }} ({{ accessForbiddenGroups.length }})</label>
 
 						<!-- Selected forbidden groups list -->
 						<div v-if="accessForbiddenGroupsDetails.length > 0" class="selected-items-list">
@@ -351,7 +351,7 @@
 								class="selected-item item-forbidden">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская группа</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom group') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -359,19 +359,19 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="removeAccessForbiddenGroup(grp.id)">
-									- Удалить
+									- {{ t('Remove') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							Группы пока не добавлены
+							{{ t('No groups added yet') }}
 						</div>
 
 						<!-- Search groups for access restriction -->
 						<div class="search-input-wrapper">
 							<NcTextField
 								v-model="groupSearchAccessForbidden"
-								placeholder="Поиск групп для ограничения доступа..."
+								:placeholder="t('Search groups to forbid access…')"
 								:disabled="saving" />
 						</div>
 
@@ -384,7 +384,7 @@
 								@click="addAccessForbiddenGroup(grp)">
 								<div class="item-info">
 									<span class="item-primary">{{ grp.name }}</span>
-									<span v-if="grp.is_cug" class="cug-badge">Пользовательская</span>
+									<span v-if="grp.is_cug" class="cug-badge">{{ t('Custom') }}</span>
 									<span v-else class="item-secondary">({{ grp.id }})</span>
 								</div>
 								<NcButton
@@ -392,12 +392,12 @@
 									size="small"
 									:disabled="saving"
 									@click.stop="addAccessForbiddenGroup(grp)">
-									+ Запретить
+									+ {{ t('Forbid') }}
 								</NcButton>
 							</div>
 						</div>
 						<div v-else class="empty-hint">
-							{{ groupSearchAccessForbidden.trim() ? 'Группы не найдены' : 'Все доступные группы уже добавлены' }}
+							{{ groupSearchAccessForbidden.trim() ? t('No groups found') : t('All available groups have been added') }}
 						</div>
 					</div>
 				</div>
@@ -413,7 +413,7 @@
 				<template #icon>
 					<NcLoadingIcon v-if="saving" :size="16" />
 				</template>
-				{{ saving ? 'Сохранить настройки' : 'Сохранить настройки' }}
+				{{ saving ? t('Saving settings…') : t('Save settings') }}
 			</NcButton>
 		</div>
 	</div>
@@ -430,6 +430,7 @@ import { loadState } from '@nextcloud/initial-state'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import axios from '@nextcloud/axios'
+import { t } from '../utils/l10n'
 import type { AdminSettingsData, AdminSettingsResponse, GroupOption, UserOption } from '../types'
 
 const defaultSettings: AdminSettingsData = {
@@ -756,7 +757,7 @@ async function save() {
 		}
 		const url = generateUrl('/apps/customusergroups/api/v1/admin/settings')
 		const res = await axios.post<AdminSettingsResponse>(url, payload)
-		showSuccess('Настройки успешно сохранены')
+		showSuccess(t('Settings saved successfully'))
 		if (res.data && res.data.settings) {
 			applySettingsResponse(res.data)
 		} else {
@@ -764,7 +765,7 @@ async function save() {
 		}
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-		const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка сохранения настроек'
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error saving settings')
 		showError(msg)
 	} finally {
 		saving.value = false

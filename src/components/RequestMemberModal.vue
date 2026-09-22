@@ -6,18 +6,17 @@
 		@close="$emit('close')">
 		<div class="request-modal-content">
 			<h2 class="form-title">
-				Запрос на добавление пользователя в группу
+				{{ t('Request to add user to group') }}
 			</h2>
 
 			<p class="request-description">
-				Вы можете предложить добавить одного или нескольких пользователей Nextcloud в группу «{{ group.name }}».
-				Запросы поступят на рассмотрение создателю и модераторам группы.
+				{{ t('You can suggest adding one or more Nextcloud users to group "{group}". Requests will be reviewed by the group creator and moderators.', { group: group.name }) }}
 			</p>
 
 			<!-- Selected Candidates Section -->
 			<div v-if="selectedCandidates.length > 0" class="form-group">
 				<label class="form-label">
-					Выбранные пользователи ({{ selectedCandidates.length }})
+					{{ t('Selected users ({count})', { count: selectedCandidates.length }) }}
 				</label>
 				<div class="selected-candidates-list">
 					<div
@@ -33,29 +32,29 @@
 							size="small"
 							:disabled="submitting"
 							@click="removeCandidate(user.uid)">
-							- Удалить
+							- {{ t('Remove') }}
 						</NcButton>
 					</div>
 				</div>
 			</div>
 			<div v-else class="no-candidates-hint">
-				Кандидаты еще не выбраны. Выберите одного или нескольких пользователей из списка ниже.
+				{{ t('No candidates selected yet. Choose one or more users from the list below.') }}
 			</div>
 
 			<!-- Search filter for users -->
 			<div class="form-group">
 				<label class="form-label">
-					Поиск пользователей
+					{{ t('Search users') }}
 				</label>
 				<NcTextField
 					v-model="searchQuery"
-					placeholder="Введите имя, email или логин пользователя..."
+					:placeholder="t('Enter user name, email, or login...')"
 					:disabled="submitting" />
 			</div>
 
 			<!-- Candidate Users List -->
 			<div v-if="loadingUsers" class="loading-state">
-				<NcLoadingIcon :size="20" /> Загрузка пользователей...
+				<NcLoadingIcon :size="20" /> {{ t('Loading users...') }}
 			</div>
 			<div v-else-if="filteredUsers.length > 0" class="available-users-list">
 				<div
@@ -72,12 +71,12 @@
 						size="small"
 						:disabled="submitting"
 						@click.stop="addCandidate(user)">
-						+ Выбрать
+						+ {{ t('Select') }}
 					</NcButton>
 				</div>
 			</div>
 			<div v-else class="empty-state">
-				{{ searchQuery.trim() !== '' ? 'Пользователи не найдены по запросу' : 'Все доступные пользователи уже состоят в группе или выбраны' }}
+				{{ searchQuery.trim() !== '' ? t('No users found for query') : t('All available users are already members of the group or selected') }}
 			</div>
 
 			<div class="modal-actions">
@@ -85,13 +84,13 @@
 					type="secondary"
 					:disabled="submitting"
 					@click="$emit('close')">
-					Отмена
+					{{ t('Cancel') }}
 				</NcButton>
 				<NcButton
 					type="primary"
 					:disabled="submitting || selectedCandidates.length === 0"
 					@click="submit">
-					{{ submitting ? 'Отправка запросов...' : ('Отправить запросы (' + selectedCandidates.length + ')') }}
+					{{ submitting ? t('Sending requests...') : t('Send requests ({count})', { count: selectedCandidates.length }) }}
 				</NcButton>
 			</div>
 		</div>
@@ -108,6 +107,7 @@ import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import type { CustomGroup, UserOption } from '../types'
+import { t } from '../utils/l10n'
 
 const props = defineProps<{
 	show: boolean
@@ -195,18 +195,18 @@ async function submit() {
 			successCount++
 		} catch (err: unknown) {
 			const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
-			const msg = axiosErr.response?.data?.error || axiosErr.message || 'Ошибка запроса'
+			const msg = axiosErr.response?.data?.error || axiosErr.message || t('Request error')
 			errors.push(`${candidate.displayName}: ${msg}`)
 		}
 	}
 
 	if (successCount > 0) {
-		showSuccess(`Успешно отправлено запросов: ${successCount}`)
+		showSuccess(t('Requests sent successfully: {count}', { count: successCount }))
 		emit('submitted')
 	}
 
 	if (errors.length > 0) {
-		showError(`Ошибки при отправке:\n${errors.join('\n')}`)
+		showError(`${t('Errors occurred while sending:')}\n${errors.join('\n')}`)
 	}
 
 	submitting.value = false
