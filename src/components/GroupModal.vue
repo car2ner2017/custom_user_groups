@@ -570,6 +570,10 @@ async function submitForm() {
 	background: var(--color-main-background);
 }
 
+.user-item:hover {
+	background-color: var(--color-background-hover);
+}
+
 .user-item-info {
 	display: flex;
 	flex-direction: column;
@@ -577,7 +581,7 @@ async function submitForm() {
 }
 
 .user-displayname {
-	font-weight: 500;
+	font-weight: 600;
 	font-size: 14px;
 	color: var(--color-main-text);
 }

@@ -537,13 +537,17 @@ async function saveChanges() {
 	background-color: var(--color-main-background);
 }
 
+.user-item:hover {
+	background-color: var(--color-background-hover);
+}
+
 .user-item-info {
 	display: flex;
 	flex-direction: column;
 }
 
 .user-displayname {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--color-main-text);
 }
@@ -556,7 +560,7 @@ async function saveChanges() {
 }
 
 .user-email-uid {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
 

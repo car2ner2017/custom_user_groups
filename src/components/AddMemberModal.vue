@@ -310,7 +310,7 @@ async function submitForm() {
 }
 
 .user-displayname {
-	font-weight: 500;
+	font-weight: 600;
 	font-size: 14px;
 	color: var(--color-main-text);
 }

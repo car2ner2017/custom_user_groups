@@ -311,13 +311,13 @@ async function submit() {
 }
 
 .user-name {
-	font-size: 13px;
-	font-weight: 500;
+	font-size: 14px;
+	font-weight: 600;
 	color: var(--color-main-text);
 }
 
 .user-email {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
 
