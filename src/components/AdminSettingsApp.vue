@@ -928,14 +928,13 @@ div[class*="toastContainer"],
 .button-vue.button-vue--tertiary,
 .button-vue[data-v-47ce59a3].button-vue--tertiary,
 .button-vue--size-small.button-vue--tertiary {
-	background-color: var(--color-primary-element-light) !important;
-	border-color: var(--color-primary-element-light-hover) !important;
-	color: var(--color-primary-element-light-text) !important;
+	background-color: var(--color-primary-element-light);
+	color: var(--color-primary-element-light-text);
 }
 
 .button-vue.button-vue--tertiary:hover:not(:disabled),
 .button-vue[data-v-47ce59a3].button-vue--tertiary:hover:not(:disabled),
 .button-vue--size-small.button-vue--tertiary:hover:not(:disabled) {
-	background-color: var(--color-primary-element-light-hover) !important;
+	background-color: var(--color-primary-element-light-hover);
 }
 </style>
