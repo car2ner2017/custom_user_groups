@@ -168,7 +168,6 @@
 			title="Предупреждение"
 			message="Внимание: вы удаляете себя из этой пользовательской группы. После удаления вы потеряете доступ к группе и делегированные права управления/модерации. Продолжить?"
 			confirm-text="Продолжить"
-			:loading="loading"
 			@close="cancelSelfRemoval"
 			@confirm="confirmSelfRemoval" />
 	</NcModal>
@@ -374,7 +373,7 @@ function cancelSelfRemoval() {
 	pendingRemoveUid.value = null
 }
 
-async function confirmSelfRemoval() {
+function confirmSelfRemoval() {
 	if (pendingRemoveUid.value) {
 		const uid = pendingRemoveUid.value
 		selectedUsers.value = selectedUsers.value.filter((u) => u.uid !== uid)
@@ -384,7 +383,6 @@ async function confirmSelfRemoval() {
 	}
 	showSelfRemoveConfirm.value = false
 	pendingRemoveUid.value = null
-	await submitForm()
 }
 
 function removeUser(uid: string) {

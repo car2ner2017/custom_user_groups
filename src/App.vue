@@ -1288,4 +1288,26 @@ div[class*="toastContainer"],
 	align-items: flex-end !important;
 	z-index: 100001 !important;
 }
+
+/* Button overrides */
+.button-vue.button-vue--error:active:not(:disabled),
+.button-vue[data-v-47ce59a3].button-vue--error:active:not(:disabled),
+.button-vue--size-small.button-vue--error:active:not(:disabled) {
+	transform: none !important;
+	background-color: var(--color-error) !important;
+}
+
+.button-vue.button-vue--tertiary,
+.button-vue[data-v-47ce59a3].button-vue--tertiary,
+.button-vue--size-small.button-vue--tertiary {
+	background-color: var(--color-primary-element-light) !important;
+	border-color: var(--color-primary-element-light-hover) !important;
+	color: var(--color-primary-element-light-text) !important;
+}
+
+.button-vue.button-vue--tertiary:hover:not(:disabled),
+.button-vue[data-v-47ce59a3].button-vue--tertiary:hover:not(:disabled),
+.button-vue--size-small.button-vue--tertiary:hover:not(:disabled) {
+	background-color: var(--color-primary-element-light-hover) !important;
+}
 </style>

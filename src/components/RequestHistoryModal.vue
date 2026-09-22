@@ -322,7 +322,7 @@ function formatDate(dateStr?: string | null): string {
 .status-tag {
 	padding: 3px 8px;
 	border-radius: 12px;
-	font-size: 11px;
+	font-size: 12px;
 	font-weight: 600;
 }
 
@@ -351,7 +351,7 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .detail-label {
-	color: var(--color-text-maxcontrast);
+	color: var(--color-main-text);
 }
 
 .detail-value {
@@ -369,8 +369,8 @@ function formatDate(dateStr?: string | null): string {
 
 .detail-date {
 	margin-left: auto;
-	font-size: 11px;
-	color: var(--color-text-maxcontrast);
+	font-size: 12px;
+	color: var(--color-main-text);
 }
 
 .modal-actions {

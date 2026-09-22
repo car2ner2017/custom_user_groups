@@ -55,7 +55,8 @@
 						<template v-else-if="isManagerOnly && del.level === 'moderate'">
 							<span class="static-level-chip moderate-chip">Модерация</span>
 							<NcButton
-								type="tertiary-no-background"
+								type="button"
+								variant="error"
 								size="small"
 								title="Отозвать права"
 								:disabled="saving"
@@ -80,7 +81,8 @@
 							</select>
 
 							<NcButton
-								type="tertiary-no-background"
+								type="button"
+								variant="error"
 								size="small"
 								title="Отозвать права"
 								:disabled="saving"
@@ -141,7 +143,8 @@
 						</span>
 
 						<NcButton
-							type="tertiary"
+							type="button"
+							variant="tertiary"
 							size="small"
 							:disabled="saving"
 							@click="assignRights(member)">
@@ -154,13 +157,15 @@
 			<!-- Modal Actions -->
 			<div class="modal-actions">
 				<NcButton
-					type="secondary"
+					type="button"
+					variant="secondary"
 					:disabled="saving"
 					@click="$emit('close')">
 					Отмена
 				</NcButton>
 				<NcButton
-					type="primary"
+					type="button"
+					variant="primary"
 					:disabled="saving || loadingDelegations || !hasChanges"
 					@click="saveChanges">
 					{{ saving ? 'Сохранение...' : 'Сохранить' }}
@@ -438,9 +443,13 @@ async function saveChanges() {
 .delegates-list {
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
-	max-height: 180px;
+	gap: 6px;
+	max-height: 160px;
 	overflow-y: auto;
+	padding: 8px;
+	background-color: var(--color-background-hover);
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
 }
 
 .delegate-card {
@@ -459,13 +468,13 @@ async function saveChanges() {
 }
 
 .delegate-name {
-	font-size: 13px;
+	font-size: 14px;
 	font-weight: 600;
 	color: var(--color-main-text);
 }
 
 .delegate-email {
-	font-size: 11px;
+	font-size: 12px;
 	color: var(--color-text-maxcontrast);
 }
 
