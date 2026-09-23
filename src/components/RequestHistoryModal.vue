@@ -143,7 +143,7 @@ watch(
 async function fetchHistory() {
 	loading.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/requests`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/requests`)
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.requests)) {
 			requests.value = response.data.requests

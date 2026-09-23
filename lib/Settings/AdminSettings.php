@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Settings;
+namespace OCA\UserGroupsHzs\Settings;
 
-use OCA\CustomUserGroups\AppInfo\Application;
-use OCA\CustomUserGroups\Service\SettingsService;
+use OCA\UserGroupsHzs\AppInfo\Application;
+use OCA\UserGroupsHzs\Service\SettingsService;
 use OCP\AppFramework\Http\TemplateResponse;
 use OCP\AppFramework\Services\IInitialState;
 use OCP\IGroupManager;
@@ -25,8 +25,8 @@ class AdminSettings implements ISettings {
 
 	#[\Override]
 	public function getForm(): TemplateResponse {
-		Util::addScript(Application::APP_ID, 'customusergroups-admin-settings');
-		Util::addStyle(Application::APP_ID, 'customusergroups-admin-settings');
+		Util::addScript(Application::APP_ID, Application::APP_ID . '-admin-settings');
+		Util::addStyle(Application::APP_ID, Application::APP_ID . '-admin-settings');
 
 		$rawSettings = $this->settingsService->getAllSettings();
 

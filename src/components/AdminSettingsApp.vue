@@ -2,7 +2,7 @@
 	<div class="admin-settings-container">
 		<!-- Section 1: Group Creation Restriction -->
 		<NcSettingsSection
-			:name="t('Custom user groups settings')"
+			:name="t('HZS User Groups settings')"
 			:description="t('Configure who is allowed to create new custom user groups in the system.')">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
@@ -144,7 +144,7 @@
 		<!-- Section 2: App Access Restriction -->
 		<NcSettingsSection
 			:name="t('App access restriction')"
-			:description="t('Configure access rules for users and groups to the Custom User Groups web interface.')">
+			:description="t('Configure access rules for users and groups to the HZS User Groups web interface.')">
 			<div class="settings-content">
 				<NcCheckboxRadioSwitch
 					v-model="accessRestrictionEnabled"
@@ -444,7 +444,7 @@ const defaultSettings: AdminSettingsData = {
 	access_forbidden_groups: [],
 }
 
-const initialRaw = loadState<AdminSettingsResponse | AdminSettingsData>('customusergroups', 'customUserGroupsSettings', defaultSettings)
+const initialRaw = loadState<AdminSettingsResponse | AdminSettingsData>('user_groups_hzs', 'customUserGroupsSettings', defaultSettings)
 const initialData: AdminSettingsData = (initialRaw && 'settings' in initialRaw) ? initialRaw.settings : (initialRaw as AdminSettingsData || defaultSettings)
 const initialDetails = (initialRaw && 'settings' in initialRaw) ? initialRaw : null
 
@@ -555,7 +555,7 @@ function applySettingsResponse(data: AdminSettingsResponse) {
 
 async function fetchSettings() {
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/admin/settings')
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/settings')
 		const res = await axios.get<AdminSettingsResponse>(url, {
 			params: { _nocache: Date.now() },
 			headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
@@ -570,7 +570,7 @@ async function fetchSettings() {
 
 async function fetchAllUsers() {
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/admin/users-search', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/users-search', { search: '', limit: 500 })
 		const res = await axios.get<{ users: UserOption[] }>(url)
 		if (res.data && Array.isArray(res.data.users)) {
 			mergeUsers(res.data.users)
@@ -582,7 +582,7 @@ async function fetchAllUsers() {
 
 async function fetchAllGroups() {
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/admin/groups-list', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/groups-list', { search: '', limit: 500 })
 		const res = await axios.get<{ groups: GroupOption[] }>(url)
 		if (res.data && Array.isArray(res.data.groups)) {
 			mergeGroups(res.data.groups)
@@ -755,7 +755,7 @@ async function save() {
 			access_forbidden_users: accessForbiddenUsers.value,
 			access_forbidden_groups: accessForbiddenGroups.value,
 		}
-		const url = generateUrl('/apps/customusergroups/api/v1/admin/settings')
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/settings')
 		const res = await axios.post<AdminSettingsResponse>(url, payload)
 		showSuccess(t('Settings saved successfully'))
 		if (res.data && res.data.settings) {

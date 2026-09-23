@@ -351,7 +351,7 @@ const filteredAvailableUsers = computed(() => {
 async function fetchUsers() {
 	loadingUsers.value = true
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/users', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/users', { search: '', limit: 500 })
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.users)) {
 			availableUsers.value = response.data.users
@@ -423,7 +423,7 @@ async function submitForm() {
 
 	try {
 		if (isEdit.value && props.group) {
-			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}`)
+			const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}`)
 			const payload: { name: string; memberIds: string[]; newOwnerId?: string } = {
 				name: name.value.trim(),
 				memberIds,
@@ -440,7 +440,7 @@ async function submitForm() {
 			showSuccess(t('Group updated successfully'))
 			emit('saved', response.data)
 		} else {
-			const url = generateUrl('/apps/customusergroups/api/v1/groups')
+			const url = generateUrl('/apps/user_groups_hzs/api/v1/groups')
 			const response = await axios.post(url, {
 				name: name.value.trim(),
 				memberIds,

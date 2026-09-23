@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Service;
+namespace OCA\UserGroupsHzs\Service;
 
 use OCP\EventDispatcher\IEventDispatcher;
 use OCP\Log\Audit\CriticalActionPerformedEvent;
@@ -32,7 +32,7 @@ class AuditService {
 			}
 		} catch (Throwable $e) {
 			$this->logger->warning('Failed to dispatch Nextcloud audit event: ' . $e->getMessage(), [
-				'app' => 'customusergroups',
+				'app' => \OCA\UserGroupsHzs\AppInfo\Application::APP_ID,
 			]);
 		}
 	}

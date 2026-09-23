@@ -1,5 +1,5 @@
 {
-	"name": "nextcloud/customusergroups",
+	"name": "nextcloud/user_groups_hzs",
 	"description": "Permit to create custom user groups based on existing users by regular user",
 	"license": "AGPL-3.0-or-later",
 	"authors": [
@@ -11,7 +11,7 @@
 	],
 	"autoload": {
 		"psr-4": {
-			"OCA\\CustomUserGroups\\": "lib/"
+			"OCA\\UserGroupsHzs\\": "lib/"
 		}
 	},
 	"scripts": {

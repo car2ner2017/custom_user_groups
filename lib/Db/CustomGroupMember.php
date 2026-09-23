@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Db;
+namespace OCA\UserGroupsHzs\Db;
 
 use DateTime;
 use JsonSerializable;

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Listener;
+namespace OCA\UserGroupsHzs\Listener;
 
-use OCA\CustomUserGroups\AppInfo\Application;
-use OCA\CustomUserGroups\Service\SettingsService;
+use OCA\UserGroupsHzs\AppInfo\Application;
+use OCA\UserGroupsHzs\Service\SettingsService;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
 use OCP\IL10N;
@@ -53,9 +53,9 @@ class NavigationListener implements IEventListener {
 		$this->navigationManager->add([
 			'id' => Application::APP_ID,
 			'order' => 10,
-			'href' => $this->urlGenerator->linkToRoute('customusergroups.page.index'),
+			'href' => $this->urlGenerator->linkToRoute(Application::APP_ID . '.page.index'),
 			'icon' => $this->urlGenerator->imagePath(Application::APP_ID, 'app-dark.svg'),
-			'name' => $this->l->t('Custom user groups'),
+			'name' => $this->l->t('HZS User Groups'),
 			'type' => INavigationManager::TYPE_APPS,
 			'app' => Application::APP_ID,
 		]);

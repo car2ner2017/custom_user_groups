@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Db;
+namespace OCA\UserGroupsHzs\Db;
 
 use DateTime;
 use OCP\AppFramework\Db\QBMapper;
@@ -21,7 +21,7 @@ class CustomGroupActivityMapper extends QBMapper {
 		private IUserManager $userManager,
 		private IL10N $l10n,
 	) {
-		parent::__construct($db, 'custom_user_group_activity', CustomGroupActivity::class);
+		parent::__construct($db, 'hzs_user_group_activity', CustomGroupActivity::class);
 	}
 
 	public function logActivity(

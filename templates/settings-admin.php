@@ -7,5 +7,5 @@ declare(strict_types=1);
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 ?>
-<div id="custom-user-groups-admin-settings"></div>
+<div id="user-groups-hzs-admin-settings"></div>
 

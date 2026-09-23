@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\AppInfo;
+namespace OCA\UserGroupsHzs\AppInfo;
 
-use OCA\CustomUserGroups\Group\CustomGroupBackend;
+use OCA\UserGroupsHzs\Group\CustomGroupBackend;
 use OCP\AppFramework\App;
 use OCP\AppFramework\Bootstrap\IBootContext;
 use OCP\AppFramework\Bootstrap\IBootstrap;
@@ -12,7 +12,7 @@ use OCP\AppFramework\Bootstrap\IRegistrationContext;
 use OCP\IGroupManager;
 
 class Application extends App implements IBootstrap {
-	public const APP_ID = 'customusergroups';
+	public const APP_ID = 'user_groups_hzs';
 
 	/** @psalm-suppress PossiblyUnusedMethod */
 	public function __construct() {
@@ -22,7 +22,7 @@ class Application extends App implements IBootstrap {
 	public function register(IRegistrationContext $context): void {
 		$context->registerEventListener(
 			\OCP\Navigation\Events\LoadAdditionalEntriesEvent::class,
-			\OCA\CustomUserGroups\Listener\NavigationListener::class
+			\OCA\UserGroupsHzs\Listener\NavigationListener::class
 		);
 	}
 

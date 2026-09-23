@@ -1,5 +1,5 @@
 <template>
-	<NcContent app-name="customusergroups">
+	<NcContent app-name="user_groups_hzs">
 		<NcAppNavigation>
 			<template #list>
 				<!-- Create Group Button -->
@@ -329,7 +329,7 @@
 			<!-- Empty State -->
 			<div v-else class="empty-state-wrapper">
 				<NcEmptyContent
-					:name="t('Custom user groups')"
+					:name="t('HZS User Groups')"
 					:description="t('Select a group from the list on the left or create a new one to share folders and files')">
 					<template #action>
 						<NcButton
@@ -438,7 +438,7 @@ import { t } from './utils/l10n'
 import type { AppState, CustomGroup, MembershipRequest } from './types'
 
 // Load initial state
-const initialState = loadState<AppState>('customusergroups', 'customusergroups-state', {
+const initialState = loadState<AppState>('user_groups_hzs', 'user_groups_hzs-state', {
 	current_user_id: null,
 	is_admin: false,
 	can_create_groups: true,
@@ -601,7 +601,7 @@ function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
 
 async function refreshGroupData(groupId: string) {
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${groupId}`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${groupId}`)
 		const response = await axios.get(url)
 		if (response.data && response.data.group) {
 			const updated = response.data.group as CustomGroup
@@ -699,7 +699,7 @@ async function fetchGroupRequests() {
 	if (!selectedGroupId.value) return
 	loadingRequests.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${selectedGroupId.value}/requests`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${selectedGroupId.value}/requests`)
 		const res = await axios.get(url)
 		if (res.data && Array.isArray(res.data.requests)) {
 			groupRequests.value = res.data.requests
@@ -715,7 +715,7 @@ async function approveRequest(requestId: number) {
 	if (!selectedGroupId.value) return
 	processingRequestId.value = requestId
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/approve`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/approve`)
 		const response = await axios.post(url)
 		if (response.data && response.data.request) {
 			const idx = groupRequests.value.findIndex((r) => r.id === requestId)
@@ -738,7 +738,7 @@ async function rejectRequest(requestId: number) {
 	if (!selectedGroupId.value) return
 	processingRequestId.value = requestId
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/reject`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${selectedGroupId.value}/requests/${requestId}/reject`)
 		const response = await axios.post(url)
 		if (response.data && response.data.request) {
 			const idx = groupRequests.value.findIndex((r) => r.id === requestId)
@@ -760,7 +760,7 @@ async function confirmDelete() {
 	if (!groupToDelete.value) return
 	deleting.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${groupToDelete.value.group_id}`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${groupToDelete.value.group_id}`)
 		await axios.delete(url)
 		showSuccess(t('Group deleted successfully'))
 		allGroups.value = allGroups.value.filter((g) => g.group_id !== groupToDelete.value?.group_id)
@@ -796,7 +796,7 @@ function formatDate(dateStr?: string | null) {
 async function reloadGroups() {
 	loadingGroups.value = true
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/groups')
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/groups')
 		const res = await axios.get(url)
 		if (res.data && Array.isArray(res.data.groups)) {
 			allGroups.value = res.data.groups

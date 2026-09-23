@@ -1,8 +1,8 @@
 {
     "openapi": "3.0.3",
     "info": {
-        "title": "customusergroups",
-        "version": "0.0.1",
+        "title": "user_groups_hzs",
+        "version": "1.3.0",
         "description": "Permit to create custom user groups based on existing users by regular user",
         "license": {
             "name": "AGPL-3.0-or-later"
@@ -47,7 +47,7 @@
         }
     },
     "paths": {
-        "/ocs/v2.php/apps/customusergroups/api": {
+        "/apps/user_groups_hzs/api/v1": {
             "get": {
                 "operationId": "api-index",
                 "summary": "An example API endpoint",

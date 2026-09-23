@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Settings;
+namespace OCA\UserGroupsHzs\Settings;
 
-use OCA\CustomUserGroups\AppInfo\Application;
+use OCA\UserGroupsHzs\AppInfo\Application;
 use OCP\IL10N;
 use OCP\IURLGenerator;
 use OCP\Settings\IIconSection;

@@ -157,7 +157,7 @@ const filteredUsers = computed(() => {
 async function fetchUsers() {
 	loadingUsers.value = true
 	try {
-		const url = generateUrl('/apps/customusergroups/api/v1/users', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/users', { search: '', limit: 500 })
 		const res = await axios.get(url)
 		if (res.data && Array.isArray(res.data.users)) {
 			availableUsers.value = res.data.users
@@ -188,7 +188,7 @@ async function submit() {
 
 	for (const candidate of selectedCandidates.value) {
 		try {
-			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/requests`)
+			const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/requests`)
 			await axios.post(url, {
 				candidateId: candidate.uid,
 			})

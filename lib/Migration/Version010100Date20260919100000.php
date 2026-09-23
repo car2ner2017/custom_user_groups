@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Migration;
+namespace OCA\UserGroupsHzs\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
@@ -30,8 +30,8 @@ class Version010100Date20260919100000 extends SimpleMigrationStep {
 		/** @var ISchemaWrapper $schema */
 		$schema = $schemaClosure();
 
-		if (!$schema->hasTable('custom_user_group_delegations')) {
-			$table = $schema->createTable('custom_user_group_delegations');
+		if (!$schema->hasTable('hzs_user_group_delegations') && !$schema->hasTable('custom_user_group_delegations')) {
+			$table = $schema->createTable('hzs_user_group_delegations');
 			$table->addColumn('id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
@@ -53,13 +53,13 @@ class Version010100Date20260919100000 extends SimpleMigrationStep {
 				'notnull' => true,
 			]);
 			$table->setPrimaryKey(['id']);
-			$table->addUniqueIndex(['group_id', 'user_id'], 'cug_del_grp_usr_idx');
-			$table->addIndex(['group_id'], 'cug_del_group_idx');
-			$table->addIndex(['user_id'], 'cug_del_user_idx');
+			$table->addUniqueIndex(['group_id', 'user_id'], 'hzs_del_grp_usr_idx');
+			$table->addIndex(['group_id'], 'hzs_del_group_idx');
+			$table->addIndex(['user_id'], 'hzs_del_user_idx');
 		}
 
-		if (!$schema->hasTable('custom_user_group_requests')) {
-			$table = $schema->createTable('custom_user_group_requests');
+		if (!$schema->hasTable('hzs_user_group_requests') && !$schema->hasTable('custom_user_group_requests')) {
+			$table = $schema->createTable('hzs_user_group_requests');
 			$table->addColumn('id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
@@ -94,9 +94,9 @@ class Version010100Date20260919100000 extends SimpleMigrationStep {
 				'default' => null,
 			]);
 			$table->setPrimaryKey(['id']);
-			$table->addIndex(['group_id', 'status'], 'cug_req_grp_stat_idx');
-			$table->addIndex(['candidate_id'], 'cug_req_cand_idx');
-			$table->addIndex(['requester_id'], 'cug_req_req_idx');
+			$table->addIndex(['group_id', 'status'], 'hzs_req_grp_stat_idx');
+			$table->addIndex(['candidate_id'], 'hzs_req_cand_idx');
+			$table->addIndex(['requester_id'], 'hzs_req_req_idx');
 		}
 
 		return $schema;

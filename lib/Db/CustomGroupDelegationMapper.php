@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Db;
+namespace OCA\UserGroupsHzs\Db;
 
 use DateTime;
 use OCP\AppFramework\Db\DoesNotExistException;
@@ -16,7 +16,7 @@ use OCP\IDBConnection;
 class CustomGroupDelegationMapper extends QBMapper {
 
 	public function __construct(IDBConnection $db) {
-		parent::__construct($db, 'custom_user_group_delegations', CustomGroupDelegation::class);
+		parent::__construct($db, 'hzs_user_group_delegations', CustomGroupDelegation::class);
 	}
 
 	/**

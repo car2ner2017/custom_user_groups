@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Db;
+namespace OCA\UserGroupsHzs\Db;
 
 use DateTime;
 use OCP\AppFramework\Db\QBMapper;
@@ -17,7 +17,7 @@ class CustomGroupMapper extends QBMapper {
 	private static bool $schemaChecked = false;
 
 	public function __construct(IDBConnection $db) {
-		parent::__construct($db, 'custom_user_groups', CustomGroupMember::class);
+		parent::__construct($db, 'hzs_user_groups', CustomGroupMember::class);
 		$this->ensureSchema();
 	}
 
@@ -28,6 +28,23 @@ class CustomGroupMapper extends QBMapper {
 		self::$schemaChecked = true;
 
 		try {
+			// Migrate from legacy custom_user_groups if present
+			$legacyTableExists = false;
+			try {
+				$checkLegacy = $this->db->getQueryBuilder();
+				$checkLegacy->select('*')->from('custom_user_groups')->setMaxResults(1);
+				$resLegacy = $checkLegacy->executeQuery();
+				$resLegacy->closeCursor();
+				$legacyTableExists = true;
+			} catch (\Throwable) {
+				$legacyTableExists = false;
+			}
+
+			if ($legacyTableExists) {
+				$this->db->executeStatement("INSERT INTO {$this->getTableName()} (id, group_id, name, creator_id, member_id, created_at, owner_id) SELECT id, group_id, name, creator_id, member_id, created_at, COALESCE(owner_id, creator_id) FROM custom_user_groups WHERE id NOT IN (SELECT id FROM {$this->getTableName()})");
+				$this->db->executeStatement("DROP TABLE custom_user_groups");
+			}
+
 			$qb = $this->db->getQueryBuilder();
 			$qb->select('*')
 				->from($this->getTableName())
@@ -488,7 +505,7 @@ class CustomGroupMapper extends QBMapper {
 
 	public function cleanupUserDelegation(string $groupId, string $userId): void {
 		$qb = $this->db->getQueryBuilder();
-		$qb->delete('custom_user_group_delegations')
+		$qb->delete('hzs_user_group_delegations')
 			->where(
 				$qb->expr()->andX(
 					$qb->expr()->eq('group_id', $qb->createNamedParameter($groupId)),
@@ -500,17 +517,17 @@ class CustomGroupMapper extends QBMapper {
 
 	public function cleanupGroupDelegationsAndRequests(string $groupId): void {
 		$qb1 = $this->db->getQueryBuilder();
-		$qb1->delete('custom_user_group_delegations')
+		$qb1->delete('hzs_user_group_delegations')
 			->where($qb1->expr()->eq('group_id', $qb1->createNamedParameter($groupId)));
 		$qb1->executeStatement();
 
 		$qb2 = $this->db->getQueryBuilder();
-		$qb2->delete('custom_user_group_requests')
+		$qb2->delete('hzs_user_group_requests')
 			->where($qb2->expr()->eq('group_id', $qb2->createNamedParameter($groupId)));
 		$qb2->executeStatement();
 
 		$qb3 = $this->db->getQueryBuilder();
-		$qb3->delete('custom_user_group_activity')
+		$qb3->delete('hzs_user_group_activity')
 			->where($qb3->expr()->eq('group_id', $qb3->createNamedParameter($groupId)));
 		$qb3->executeStatement();
 	}

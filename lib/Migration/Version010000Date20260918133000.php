@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Migration;
+namespace OCA\UserGroupsHzs\Migration;
 
 use Closure;
 use OCP\DB\ISchemaWrapper;
@@ -30,8 +30,8 @@ class Version010000Date20260918133000 extends SimpleMigrationStep {
 		/** @var ISchemaWrapper $schema */
 		$schema = $schemaClosure();
 
-		if (!$schema->hasTable('custom_user_groups')) {
-			$table = $schema->createTable('custom_user_groups');
+		if (!$schema->hasTable('hzs_user_groups') && !$schema->hasTable('custom_user_groups')) {
+			$table = $schema->createTable('hzs_user_groups');
 			$table->addColumn('id', Types::BIGINT, [
 				'autoincrement' => true,
 				'notnull' => true,
@@ -58,9 +58,9 @@ class Version010000Date20260918133000 extends SimpleMigrationStep {
 				'notnull' => true,
 			]);
 			$table->setPrimaryKey(['id']);
-			$table->addIndex(['group_id'], 'cug_group_id_idx');
-			$table->addIndex(['creator_id'], 'cug_creator_id_idx');
-			$table->addIndex(['member_id'], 'cug_member_id_idx');
+			$table->addIndex(['group_id'], 'hzs_group_id_idx');
+			$table->addIndex(['creator_id'], 'hzs_creator_id_idx');
+			$table->addIndex(['member_id'], 'hzs_member_id_idx');
 		}
 
 		return $schema;

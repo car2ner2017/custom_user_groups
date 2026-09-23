@@ -164,7 +164,7 @@ watch(
 async function fetchActivities() {
 	loading.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/activities`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/activities`)
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.activities)) {
 			activities.value = response.data.activities

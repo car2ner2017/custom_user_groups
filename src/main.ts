@@ -3,4 +3,4 @@ import App from './App.vue'
 import '@nextcloud/dialogs/style.css'
 
 const app = createApp(App)
-app.mount('#customusergroups')
+app.mount('#user_groups_hzs')

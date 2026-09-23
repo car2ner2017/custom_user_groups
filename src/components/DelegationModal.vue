@@ -294,7 +294,7 @@ const hasChanges = computed(() => {
 async function fetchDelegations() {
 	loadingDelegations.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/delegations`)
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.delegations)) {
 			initialDelegations.value = response.data.delegations
@@ -372,11 +372,11 @@ async function saveChanges() {
 	try {
 		const promises = []
 		for (const uid of toRevoke) {
-			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations/${uid}`)
+			const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/delegations/${uid}`)
 			promises.push(axios.delete(url))
 		}
 		for (const item of toSave) {
-			const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/delegations`)
+			const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/delegations`)
 			promises.push(axios.post(url, {
 				userId: item.userId,
 				level: item.level,
@@ -461,6 +461,10 @@ async function saveChanges() {
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
 	background-color: var(--color-main-background);
+}
+
+.delegate-card:hover {
+	background-color: var(--color-background-hover);
 }
 
 .delegate-info {

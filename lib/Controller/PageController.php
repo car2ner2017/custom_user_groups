@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Controller;
+namespace OCA\UserGroupsHzs\Controller;
 
 use DateTime;
-use OCA\CustomUserGroups\AppInfo\Application;
-use OCA\CustomUserGroups\Db\CustomGroupDelegation;
-use OCA\CustomUserGroups\Db\CustomGroupDelegationMapper;
-use OCA\CustomUserGroups\Db\CustomGroupMapper;
-use OCA\CustomUserGroups\Db\CustomGroupRequestMapper;
-use OCA\CustomUserGroups\Service\SettingsService;
+use OCA\UserGroupsHzs\AppInfo\Application;
+use OCA\UserGroupsHzs\Db\CustomGroupDelegation;
+use OCA\UserGroupsHzs\Db\CustomGroupDelegationMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupRequestMapper;
+use OCA\UserGroupsHzs\Service\SettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;
@@ -168,7 +168,7 @@ class PageController extends Controller {
 			'groups' => $groups,
 		];
 
-		$this->initialStateService->provideInitialState('customusergroups-state', $state);
+		$this->initialStateService->provideInitialState('user_groups_hzs-state', $state);
 
 		return new TemplateResponse(
 			Application::APP_ID,

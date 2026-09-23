@@ -1,5 +1,5 @@
 {
-  "name": "customusergroups",
+  "name": "user_groups_hzs",
   "version": "1.0.0",
   "license": "AGPL-3.0-or-later",
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "vite --mode development build",
     "lint": "eslint src",
     "stylelint": "stylelint src/**/*.vue src/**/*.scss src/**/*.css",
+    "release": "bash scripts/create-release.sh",
     "watch": "vite --mode development build --watch"
   },
   "browserslist": [

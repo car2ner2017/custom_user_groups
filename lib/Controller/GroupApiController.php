@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Controller;
+namespace OCA\UserGroupsHzs\Controller;
 
 use DateTime;
 use Exception;
-use OCA\CustomUserGroups\Db\CustomGroupActivity;
-use OCA\CustomUserGroups\Db\CustomGroupActivityMapper;
-use OCA\CustomUserGroups\Db\CustomGroupDelegation;
-use OCA\CustomUserGroups\Db\CustomGroupDelegationMapper;
-use OCA\CustomUserGroups\Db\CustomGroupMapper;
-use OCA\CustomUserGroups\Db\CustomGroupRequest;
-use OCA\CustomUserGroups\Db\CustomGroupRequestMapper;
-use OCA\CustomUserGroups\Service\AuditService;
-use OCA\CustomUserGroups\Service\SettingsService;
+use OCA\UserGroupsHzs\Db\CustomGroupActivity;
+use OCA\UserGroupsHzs\Db\CustomGroupActivityMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupDelegation;
+use OCA\UserGroupsHzs\Db\CustomGroupDelegationMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupRequest;
+use OCA\UserGroupsHzs\Db\CustomGroupRequestMapper;
+use OCA\UserGroupsHzs\Service\AuditService;
+use OCA\UserGroupsHzs\Service\SettingsService;
 use OCP\AppFramework\Controller;
 use OCP\AppFramework\Http;
 use OCP\AppFramework\Http\Attribute\FrontpageRoute;

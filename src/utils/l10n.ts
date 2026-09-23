@@ -6,5 +6,5 @@ import { t as ncTranslate } from '@nextcloud/l10n'
  * @param vars Optional variables/placeholders to replace in the text
  */
 export function t(text: string, vars?: Record<string, string | number | boolean | null | undefined>): string {
-	return ncTranslate('customusergroups', text, vars as Record<string, string | number>)
+	return ncTranslate('user_groups_hzs', text, vars as Record<string, string | number>)
 }

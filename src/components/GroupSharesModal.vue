@@ -174,7 +174,7 @@ watch(
 async function fetchShares() {
 	loading.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/shares`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/shares`)
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.shares)) {
 			shares.value = response.data.shares
@@ -240,7 +240,7 @@ async function confirmRevokeShare() {
 	if (!shareToRevoke.value) return
 	revoking.value = true
 	try {
-		const url = generateUrl(`/apps/customusergroups/api/v1/groups/${props.group.group_id}/shares/${shareToRevoke.value.id}`)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${props.group.group_id}/shares/${shareToRevoke.value.id}`)
 		await axios.delete(url)
 		showSuccess(t('Shared resource access revoked'))
 		shares.value = shares.value.filter((s) => s.id !== shareToRevoke.value?.id)

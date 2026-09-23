@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Group;
+namespace OCA\UserGroupsHzs\Group;
 
-use OCA\CustomUserGroups\Db\CustomGroupMapper;
+use OCA\UserGroupsHzs\Db\CustomGroupMapper;
 use OCP\Group\Backend\ABackend;
 use OCP\Group\Backend\IAddToGroupBackend;
 use OCP\Group\Backend\ICountUsersBackend;

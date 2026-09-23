@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	  xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
-	<id>customusergroups</id>
-	<name>Custom User Groups</name>
+	<id>user_groups_hzs</id>
+	<name>HZS User Groups</name>
 	<summary>Permit to create custom user groups based on existing users by regular user</summary>
 	<description>Permit to create custom user groups based on existing users by regular user</description>
-	<version>1.2.0</version>
+	<version>1.3.0</version>
 	<licence>AGPL-3.0-or-later</licence>
 	<author mail="car2ner2017@gmail.com" homepage="https://github.com/car2ner2017">Jakonda</author>
-	<namespace>CustomUserGroups</namespace>
+	<namespace>UserGroupsHzs</namespace>
 	<types>
 		<authentication/>
 		<filesystem/>
@@ -21,7 +21,7 @@
 		<nextcloud min-version="31" max-version="36"/>
 	</dependencies>
 	<settings>
-		<admin>OCA\CustomUserGroups\Settings\AdminSettings</admin>
-		<admin-section>OCA\CustomUserGroups\Settings\AdminSection</admin-section>
+		<admin>OCA\UserGroupsHzs\Settings\AdminSettings</admin>
+		<admin-section>OCA\UserGroupsHzs\Settings\AdminSection</admin-section>
 	</settings>
 </info>

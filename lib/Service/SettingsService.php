@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace OCA\CustomUserGroups\Service;
+namespace OCA\UserGroupsHzs\Service;
 
-use OCA\CustomUserGroups\AppInfo\Application;
+use OCA\UserGroupsHzs\AppInfo\Application;
 use OCP\IConfig;
 use OCP\IGroupManager;
 use OCP\IUserManager;
