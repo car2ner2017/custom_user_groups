@@ -80,7 +80,7 @@ class Version010200Date20260919160000 extends SimpleMigrationStep {
 			$activityTable->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$activityTable->setPrimaryKey(['id']);
+			$activityTable->setPrimaryKey(['id'], 'hzs_act_pk');
 			$activityTable->addIndex(['group_id', 'created_at'], 'hzs_act_grp_date_idx');
 			$activityTable->addIndex(['actor_id'], 'hzs_act_act_idx');
 		}

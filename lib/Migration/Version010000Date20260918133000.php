@@ -57,7 +57,7 @@ class Version010000Date20260918133000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_grp_pk');
 			$table->addIndex(['group_id'], 'hzs_group_id_idx');
 			$table->addIndex(['creator_id'], 'hzs_creator_id_idx');
 			$table->addIndex(['member_id'], 'hzs_member_id_idx');

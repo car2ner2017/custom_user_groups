@@ -69,7 +69,7 @@ class Version010300Date20260923080000 extends SimpleMigrationStep {
 				'length' => 64,
 				'default' => null,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_grp_pk');
 			$table->addIndex(['group_id'], 'hzs_group_id_idx');
 			$table->addIndex(['creator_id'], 'hzs_creator_id_idx');
 			$table->addIndex(['member_id'], 'hzs_member_id_idx');
@@ -99,7 +99,7 @@ class Version010300Date20260923080000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_del_pk');
 			$table->addUniqueIndex(['group_id', 'user_id'], 'hzs_del_grp_usr_idx');
 			$table->addIndex(['group_id'], 'hzs_del_group_idx');
 			$table->addIndex(['user_id'], 'hzs_del_user_idx');
@@ -141,7 +141,7 @@ class Version010300Date20260923080000 extends SimpleMigrationStep {
 				'length' => 64,
 				'default' => null,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_req_pk');
 			$table->addIndex(['group_id', 'status'], 'hzs_req_grp_stat_idx');
 			$table->addIndex(['candidate_id'], 'hzs_req_cand_idx');
 			$table->addIndex(['requester_id'], 'hzs_req_req_idx');
@@ -179,7 +179,7 @@ class Version010300Date20260923080000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_act_pk');
 			$table->addIndex(['group_id', 'created_at'], 'hzs_act_grp_date_idx');
 			$table->addIndex(['actor_id'], 'hzs_act_act_idx');
 		}

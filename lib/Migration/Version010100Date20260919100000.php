@@ -52,7 +52,7 @@ class Version010100Date20260919100000 extends SimpleMigrationStep {
 			$table->addColumn('created_at', Types::DATETIME, [
 				'notnull' => true,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_del_pk');
 			$table->addUniqueIndex(['group_id', 'user_id'], 'hzs_del_grp_usr_idx');
 			$table->addIndex(['group_id'], 'hzs_del_group_idx');
 			$table->addIndex(['user_id'], 'hzs_del_user_idx');
@@ -93,7 +93,7 @@ class Version010100Date20260919100000 extends SimpleMigrationStep {
 				'length' => 64,
 				'default' => null,
 			]);
-			$table->setPrimaryKey(['id']);
+			$table->setPrimaryKey(['id'], 'hzs_req_pk');
 			$table->addIndex(['group_id', 'status'], 'hzs_req_grp_stat_idx');
 			$table->addIndex(['candidate_id'], 'hzs_req_cand_idx');
 			$table->addIndex(['requester_id'], 'hzs_req_req_idx');
