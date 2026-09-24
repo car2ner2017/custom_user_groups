@@ -3,6 +3,7 @@ OC.L10N.register(
     {
     "HZS User Groups" : "HZS Пользовательские группы",
     "HZS User Groups settings" : "Настройка HZS Пользовательских групп",
+    "User Groups" : "Пользовательские группы",
     "Custom user groups" : "Пользовательские группы",
     "Custom User Groups" : "Пользовательские группы",
     "Custom user groups settings" : "Настройка пользовательских групп",
