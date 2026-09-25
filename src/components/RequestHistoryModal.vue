@@ -71,7 +71,7 @@
 						<div class="detail-row">
 							<span class="detail-label">{{ t('Suggested by:') }}</span>
 							<span class="detail-value">
-								{{ req.requester_displayName }} ({{ '@' + req.requester_id }})
+								{{ req.requester_displayName }} ({{ req.requester_email || req.requester_id }})
 							</span>
 							<span class="detail-date">{{ formatDate(req.created_at) }}</span>
 						</div>

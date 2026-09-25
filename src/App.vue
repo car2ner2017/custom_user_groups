@@ -241,7 +241,7 @@
 
 							<div class="request-meta-row">
 								<span class="request-author">
-									{{ t('Suggested by:') }} <strong>{{ req.requester_displayName }}</strong> ({{ '@' + req.requester_id }}) {{ t('at {time}', { time: formatDate(req.created_at) }) }}
+									{{ t('Suggested by:') }} <strong>{{ req.requester_displayName }}</strong> ({{ req.requester_email || req.requester_id }}) {{ t('at {time}', { time: formatDate(req.created_at) }) }}
 								</span>
 								<span v-if="req.status !== 'pending' && req.processed_by" class="request-resolver">
 									{{ req.status === 'approved' ? t('Approved by') : t('Rejected by') }}:
@@ -289,7 +289,8 @@
 						<div
 							v-for="member in filteredMembers"
 							:key="member.uid"
-							class="member-card">
+							class="member-card"
+							@click="openMemberDetailsModal(member)">
 							<div class="member-avatar">
 								{{ member.displayName.charAt(0).toUpperCase() }}
 							</div>
@@ -409,6 +410,16 @@
 			:loading="deleting"
 			@close="showDeleteModal = false"
 			@confirm="confirmDelete" />
+
+		<!-- Member Details Modal -->
+		<MemberDetailsModal
+			:show="showMemberDetailsModal"
+			:member="selectedMemberForModal"
+			:group="selectedGroup"
+			:can-exclude="canExcludeSelectedMember"
+			:loading="excludingMember"
+			@close="showMemberDetailsModal = false"
+			@exclude="excludeMemberFromGroup" />
 	</NcContent>
 </template>
 
@@ -434,8 +445,9 @@ import RequestHistoryModal from './components/RequestHistoryModal.vue'
 import GroupActivityModal from './components/GroupActivityModal.vue'
 import GroupSharesModal from './components/GroupSharesModal.vue'
 import ConfirmModal from './components/ConfirmModal.vue'
+import MemberDetailsModal from './components/MemberDetailsModal.vue'
 import { t } from './utils/l10n'
-import type { AppState, CustomGroup, MembershipRequest } from './types'
+import type { AppState, CustomGroup, MembershipRequest, UserOption } from './types'
 
 // Load initial state
 const initialState = loadState<AppState>('user_groups_hzs', 'user_groups_hzs-state', {
@@ -470,6 +482,9 @@ const showHistoryModal = ref(false)
 const showActivityModal = ref(false)
 const showSharesModal = ref(false)
 const showDeleteModal = ref(false)
+const showMemberDetailsModal = ref(false)
+const selectedMemberForModal = ref<UserOption | null>(null)
+const excludingMember = ref(false)
 const groupToDelete = ref<CustomGroup | null>(null)
 const deleting = ref(false)
 const deleteConfirmMessage = computed(() =>
@@ -597,6 +612,42 @@ const canDirectAddMembers = computed(() => {
 	const level = selectedGroup.value.permissions?.delegation_level
 	return level === 'manage' || level === 'moderate'
 })
+
+const canExcludeSelectedMember = computed(() => {
+	if (!selectedGroup.value || !selectedMemberForModal.value) return false
+	const ownerId = selectedGroup.value.owner_id || selectedGroup.value.creator_id
+	if (selectedMemberForModal.value.uid === ownerId) return false
+	return canDirectAddMembers.value
+})
+
+function openMemberDetailsModal(member: UserOption) {
+	selectedMemberForModal.value = member
+	showMemberDetailsModal.value = true
+}
+
+async function excludeMemberFromGroup(member: UserOption) {
+	if (!selectedGroup.value) return
+	excludingMember.value = true
+	try {
+		const currentMemberIds = selectedGroup.value.member_ids || []
+		const newMemberIds = currentMemberIds.filter((uid) => uid !== member.uid)
+		const url = generateUrl(`/apps/user_groups_hzs/api/v1/groups/${selectedGroup.value.group_id}`)
+		await axios.put(url, {
+			name: selectedGroup.value.name,
+			memberIds: newMemberIds,
+		})
+		showSuccess(t('User excluded from group'))
+		showMemberDetailsModal.value = false
+		await refreshGroupData(selectedGroup.value.group_id)
+		await reloadGroups()
+	} catch (err: unknown) {
+		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
+		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Failed to exclude user')
+		showError(msg)
+	} finally {
+		excludingMember.value = false
+	}
+}
 
 function getMemberDelegationLevel(uid: string): 'manage' | 'moderate' | null {
 	if (!selectedGroup.value?.delegations) return null
@@ -1187,6 +1238,13 @@ async function reloadGroups() {
 	border-radius: var(--border-radius-element);
 	background: var(--color-main-background);
 	position: relative;
+	cursor: pointer;
+	transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.member-card:hover {
+	background: var(--color-background-hover);
+	border-color: var(--color-primary-element);
 }
 
 .member-avatar {

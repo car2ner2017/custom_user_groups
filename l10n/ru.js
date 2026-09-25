@@ -277,6 +277,10 @@ OC.L10N.register(
     "All ({count})" : "Все ({count})",
     "Are you sure you want to revoke access of group \"{group}\" to {type} \"{name}\"? Group members will lose access to this resource." : "Вы уверены, что хотите отозвать доступ группы «{group}» к {type} «{name}»? Участники группы потеряют доступ к этому ресурсу.",
     "You can suggest adding one or more Nextcloud users to group \"{group}\". Requests will be reviewed by the group creator and moderators." : "Вы можете предложить добавление одного или нескольких пользователей Nextcloud в группу «{group}». Заявки будут рассмотрены создателем и модераторами группы.",
-    "No candidates selected yet. Search and select users below." : "Кандидаты еще не выбраны. Найдите и выберите пользователей ниже."
+    "No candidates selected yet. Search and select users below." : "Кандидаты еще не выбраны. Найдите и выберите пользователей ниже.",
+    "Group member" : "Участник группы",
+    "Exclude" : "Исключить",
+    "User excluded from group" : "Пользователь исключен из группы",
+    "Failed to exclude user" : "Не удалось исключить пользователя"
 },
 "nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);");

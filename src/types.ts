@@ -31,6 +31,7 @@ export interface MembershipRequest {
 	candidate_email: string
 	requester_id: string
 	requester_displayName: string
+	requester_email?: string
 	status: 'pending' | 'approved' | 'rejected'
 	created_at: string
 	updated_at: string

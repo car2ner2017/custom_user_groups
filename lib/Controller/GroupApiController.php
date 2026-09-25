@@ -1296,6 +1296,7 @@ class GroupApiController extends Controller {
 			'candidate_email' => ($candUser && $candUser->getEMailAddress()) ? $candUser->getEMailAddress() : '',
 			'requester_id' => $r->getRequesterId(),
 			'requester_displayName' => $reqUser ? $reqUser->getDisplayName() : $r->getRequesterId(),
+			'requester_email' => ($reqUser && $reqUser->getEMailAddress()) ? $reqUser->getEMailAddress() : '',
 			'status' => $r->getStatus(),
 			'created_at' => $r->getCreatedAt()?->format(DateTime::ATOM),
 			'updated_at' => $r->getUpdatedAt()?->format(DateTime::ATOM),
