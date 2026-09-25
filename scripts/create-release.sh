@@ -6,28 +6,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 RELEASE_DIR="${APP_DIR}/release"
 
-echo "==> Building frontend assets for production..."
+echo "==> Cleaning old chunk files before build..."
 cd "${APP_DIR}"
-npm run build
+rm -f css/*.chunk.css js/*.chunk.mjs js/*.chunk.mjs.map css/*.chunk.css.map
 
-echo "==> Cleaning up obsolete chunk files..."
-python3 -c "
-import glob, os
-keep = {
-    'user_groups_hzs-main.css',
-    'user_groups_hzs-admin-settings.css',
-    'admin-settings-CxseCR_S.chunk.css',
-    'style-ClC9qrHl.chunk.css',
-    'main-DJmGZoe9.chunk.css'
-}
-for f in glob.glob('css/*.chunk.css'):
-    basename = os.path.basename(f)
-    if basename not in keep:
-        try:
-            os.remove(f)
-        except OSError:
-            pass
-"
+echo "==> Building frontend assets for production..."
+npm run build
 
 echo "==> Preparing release directory..."
 mkdir -p "${RELEASE_DIR}"

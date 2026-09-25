@@ -422,18 +422,20 @@ class GroupApiController extends Controller {
 
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/users')]
-	public function searchUsers(string $search = '', int $limit = 50): JSONResponse {
+	public function searchUsers(string $search = '', int $limit = 5000): JSONResponse {
 		if ($err = $this->checkAccess()) {
 			return $err;
 		}
 
-		$limit = min(max(1, $limit), 500);
+		$search = trim($search);
+		$limit = min(max(1, $limit), 10000);
 		$users = $this->userManager->search($search, $limit);
 
 		$result = [];
-		foreach ($users as $user) {
+		foreach ($users ?: [] as $user) {
 			if ($user instanceof IUser) {
 				$result[] = [
+					'id' => $user->getUID(),
 					'uid' => $user->getUID(),
 					'displayName' => $user->getDisplayName(),
 					'email' => $user->getEMailAddress() ?: '',
@@ -895,14 +897,16 @@ class GroupApiController extends Controller {
 	}
 
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/groups-list')]
-	public function getAdminGroupsList(string $search = '', int $limit = 500): JSONResponse {
+	public function getAdminGroupsList(string $search = '', int $limit = 5000): JSONResponse {
 		if ($err = $this->checkAdmin()) {
 			return $err;
 		}
 
+		$search = trim($search);
+		$limit = min(max(1, $limit), 10000);
 		$groups = $this->groupManager->search($search, $limit);
 		$result = [];
-		foreach ($groups as $group) {
+		foreach ($groups ?: [] as $group) {
 			$result[] = [
 				'id' => $group->getGID(),
 				'name' => $group->getDisplayName(),
@@ -914,15 +918,16 @@ class GroupApiController extends Controller {
 	}
 
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/admin/users-search')]
-	public function searchAdminUsers(string $search = '', int $limit = 500): JSONResponse {
+	public function searchAdminUsers(string $search = '', int $limit = 5000): JSONResponse {
 		if ($err = $this->checkAdmin()) {
 			return $err;
 		}
 
 		$search = trim($search);
+		$limit = min(max(1, $limit), 10000);
 		$users = $this->userManager->search($search, $limit);
 		$result = [];
-		foreach ($users as $user) {
+		foreach ($users ?: [] as $user) {
 			if ($user instanceof IUser) {
 				$result[] = [
 					'id' => $user->getUID(),

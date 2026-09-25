@@ -570,7 +570,7 @@ async function fetchSettings() {
 
 async function fetchAllUsers() {
 	try {
-		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/users-search', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/users-search')
 		const res = await axios.get<{ users: UserOption[] }>(url)
 		if (res.data && Array.isArray(res.data.users)) {
 			mergeUsers(res.data.users)
@@ -582,7 +582,7 @@ async function fetchAllUsers() {
 
 async function fetchAllGroups() {
 	try {
-		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/groups-list', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/groups-list')
 		const res = await axios.get<{ groups: GroupOption[] }>(url)
 		if (res.data && Array.isArray(res.data.groups)) {
 			mergeGroups(res.data.groups)

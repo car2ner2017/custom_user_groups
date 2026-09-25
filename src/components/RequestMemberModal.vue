@@ -144,7 +144,7 @@ const filteredUsers = computed(() => {
 	const unselected = availableUsers.value.filter((u) => !existingUids.has(u.uid) && !selectedUids.has(u.uid))
 
 	const query = searchQuery.value.trim().toLowerCase()
-	if (query === '') return unselected
+	if (!query) return unselected.slice(0, 50)
 
 	return unselected.filter((u) => {
 		const nameMatch = u.displayName.toLowerCase().includes(query)
@@ -157,7 +157,7 @@ const filteredUsers = computed(() => {
 async function fetchUsers() {
 	loadingUsers.value = true
 	try {
-		const url = generateUrl('/apps/user_groups_hzs/api/v1/users', { search: '', limit: 500 })
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/users')
 		const res = await axios.get(url)
 		if (res.data && Array.isArray(res.data.users)) {
 			availableUsers.value = res.data.users
