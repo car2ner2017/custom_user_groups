@@ -100,17 +100,51 @@
 					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					{{ t('No members selected yet. Use the search dropdown below to add members.') }}
+					{{ t('No members selected yet. Add them from the list below.') }}
 				</div>
 
-				<!-- Search users dropdown in Nextcloud Files Sharing style -->
-				<UserSearchDropdown
-					:label="isEdit ? t('Add member') : t('Search Nextcloud users to add')"
-					input-id="group-add-member-search"
-					:disabled="loading"
-					:exclude-uids="selectedUserUids"
-					:placeholder="t('Search Nextcloud users to add…')"
-					@select="addUser" />
+				<label v-if="isEdit" class="form-label">
+					{{ t('Add member') }}
+				</label>
+				<label v-else class="form-label">
+					{{ t('Search Nextcloud users to add') }}
+				</label>
+
+				<!-- Search users input for adding new members -->
+				<div class="search-user-wrapper">
+					<NcTextField
+						v-model="userSearchQuery"
+						:placeholder="t('Search Nextcloud users to add…')"
+						:disabled="loading" />
+				</div>
+
+				<!-- Available users list -->
+				<div v-if="loadingUsers" class="loading-users">
+					<NcLoadingIcon :size="20" /> {{ t('Loading users…') }}
+				</div>
+				<div v-else-if="userSearchQuery.trim() !== '' && filteredAvailableUsers.length > 0" class="available-users-list">
+					<div
+						v-for="user in filteredAvailableUsers"
+						:key="user.uid"
+						class="user-item"
+						@click="addUser(user)">
+						<div class="user-item-info">
+							<span class="user-displayname">{{ user.displayName }}</span>
+							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
+						</div>
+						<NcButton
+							type="button"
+							variant="tertiary"
+							size="small"
+							:disabled="loading"
+							@click.stop="addUser(user)">
+							+ {{ t('Add') }}
+						</NcButton>
+					</div>
+				</div>
+				<div v-else-if="userSearchQuery.trim() !== ''" class="empty-users">
+					{{ t('No users found matching query') }}
+				</div>
 			</div>
 
 			<!-- Modal Actions -->
@@ -148,12 +182,12 @@ import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
 import NcTextField from '@nextcloud/vue/components/NcTextField'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
+import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import { t } from '../utils/l10n'
 import ConfirmModal from './ConfirmModal.vue'
-import UserSearchDropdown from './UserSearchDropdown.vue'
 import type { CustomGroup, UserOption } from '../types'
 
 const props = defineProps<{
@@ -199,8 +233,12 @@ const name = ref('')
 const selectedNewOwnerId = ref<string>('')
 const selectedUsers = ref<UserOption[]>([])
 const selectedMembersFilter = ref('')
-const selectedUserUids = computed(() => selectedUsers.value.map((u) => u.uid))
+const availableUsers = ref<UserOption[]>([])
+const userSearchQuery = ref('')
+const loadingUsers = ref(false)
 const loading = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
+let currentReqId = 0
 
 const showSelfRemoveConfirm = ref(false)
 const pendingRemoveUid = ref<string | null>(null)
@@ -282,6 +320,9 @@ watch(
 				}
 			}
 			selectedMembersFilter.value = ''
+			userSearchQuery.value = ''
+			availableUsers.value = []
+			loadingUsers.value = false
 		}
 		showSelfRemoveConfirm.value = false
 		pendingRemoveUid.value = null
@@ -298,6 +339,56 @@ const filteredSelectedUsers = computed(() => {
 		const emailMatch = u.email ? u.email.toLowerCase().includes(query) : false
 		return nameMatch || uidMatch || emailMatch
 	})
+})
+
+const filteredAvailableUsers = computed(() => {
+	const query = userSearchQuery.value.trim().toLowerCase()
+	if (!query) return []
+	const selectedUids = new Set(selectedUsers.value.map((u) => u.uid))
+	return availableUsers.value.filter((u) => !selectedUids.has(u.uid))
+})
+
+async function fetchUsers(search: string) {
+	const trimmed = search.trim()
+	if (!trimmed) {
+		availableUsers.value = []
+		loadingUsers.value = false
+		return
+	}
+	const reqId = ++currentReqId
+	loadingUsers.value = true
+	try {
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/users')
+		const response = await axios.get(url, {
+			params: {
+				search: trimmed,
+				limit: 100,
+			},
+		})
+		if (reqId !== currentReqId) return
+		if (response.data && Array.isArray(response.data.users)) {
+			availableUsers.value = response.data.users
+		}
+	} catch (err: unknown) {
+		console.error('Error fetching Nextcloud users:', err)
+	} finally {
+		if (reqId === currentReqId) {
+			loadingUsers.value = false
+		}
+	}
+}
+
+watch(userSearchQuery, (newVal) => {
+	if (searchTimer) clearTimeout(searchTimer)
+	const trimmed = newVal.trim()
+	if (!trimmed) {
+		availableUsers.value = []
+		loadingUsers.value = false
+		return
+	}
+	searchTimer = setTimeout(() => {
+		fetchUsers(trimmed)
+	}, 300)
 })
 
 function addUser(user: UserOption) {
@@ -469,6 +560,31 @@ async function submitForm() {
 	padding: 8px 12px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
+}
+
+.search-user-wrapper {
+	margin-top: 4px;
+}
+
+.loading-users,
+.empty-users {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 12px;
+	font-size: 13px;
+	color: var(--color-text-maxcontrast);
+	background: var(--color-background-hover);
+	border-radius: var(--border-radius-element);
+}
+
+.available-users-list {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-height: 200px;
+	overflow-y: auto;
 }
 
 .user-item {

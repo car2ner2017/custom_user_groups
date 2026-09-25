@@ -71,16 +71,9 @@
 								</NcButton>
 							</div>
 						</div>
-						<div v-else class="empty-hint">
-							{{ userSearchCreate.trim() ? t('No users found') : t('All available users have been added') }}
+						<div v-if="userSearchCreate.trim() !== '' && filteredAvailableCreateUsers.length === 0" class="empty-hint">
+							{{ t('No users found') }}
 						</div>
-						<UserSearchDropdown
-							input-id="admin-search-create-users"
-							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
-							:disabled="saving"
-							:exclude-uids="createAllowedUsers"
-							:placeholder="t('Search Nextcloud users to add…')"
-							@select="addCreateUser" />
 					</div>
 
 					<!-- Allowed Groups Selection -->
@@ -219,16 +212,9 @@
 								</NcButton>
 							</div>
 						</div>
-						<div v-else class="empty-hint">
-							{{ userSearchAccessAllowed.trim() ? t('No users found') : t('All available users have been added') }}
+						<div v-if="userSearchAccessAllowed.trim() !== '' && filteredAvailableAccessAllowedUsers.length === 0" class="empty-hint">
+							{{ t('No users found') }}
 						</div>
-						<UserSearchDropdown
-							input-id="admin-search-access-allowed-users"
-							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
-							:disabled="saving"
-							:exclude-uids="accessAllowedUsers"
-							:placeholder="t('Search users to allow access…')"
-							@select="addAccessAllowedUser" />
 					</div>
 
 					<!-- Allowed Groups Selection -->
@@ -348,16 +334,9 @@
 								</NcButton>
 							</div>
 						</div>
-						<div v-else class="empty-hint">
-							{{ userSearchAccessForbidden.trim() ? t('No users found') : t('All available users have been added') }}
+						<div v-if="userSearchAccessForbidden.trim() !== '' && filteredAvailableAccessForbiddenUsers.length === 0" class="empty-hint">
+							{{ t('No users found') }}
 						</div>
-						<UserSearchDropdown
-							input-id="admin-search-access-forbidden-users"
-							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
-							:disabled="saving"
-							:exclude-uids="accessForbiddenUsers"
-							:placeholder="t('Search users to forbid access…')"
-							@select="addAccessForbiddenUser" />
 					</div>
 
 					<!-- Forbidden Groups Selection -->
@@ -441,7 +420,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import NcSettingsSection from '@nextcloud/vue/components/NcSettingsSection'
 import NcCheckboxRadioSwitch from '@nextcloud/vue/components/NcCheckboxRadioSwitch'
 import NcButton from '@nextcloud/vue/components/NcButton'
@@ -451,7 +430,6 @@ import { loadState } from '@nextcloud/initial-state'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import axios from '@nextcloud/axios'
-import UserSearchDropdown from './UserSearchDropdown.vue'
 import { t } from '../utils/l10n'
 import type { AdminSettingsData, AdminSettingsResponse, GroupOption, UserOption } from '../types'
 
@@ -614,12 +592,39 @@ async function fetchAllGroups() {
 	}
 }
 
+let adminSearchTimer: ReturnType<typeof setTimeout> | null = null
+
+async function searchAdminUsers(query: string) {
+	const trimmed = query.trim()
+	if (!trimmed) return
+	try {
+		const url = generateUrl('/apps/user_groups_hzs/api/v1/admin/users-search')
+		const res = await axios.get<{ users: UserOption[] }>(url, {
+			params: { search: trimmed, limit: 100 },
+		})
+		if (res.data && Array.isArray(res.data.users)) {
+			mergeUsers(res.data.users)
+		}
+	} catch (err) {
+		console.error('Failed to search users:', err)
+	}
+}
+
+watch([userSearchCreate, userSearchAccessAllowed, userSearchAccessForbidden], ([qCreate, qAllowed, qForbidden]) => {
+	if (adminSearchTimer) clearTimeout(adminSearchTimer)
+	const query = qCreate.trim() || qAllowed.trim() || qForbidden.trim()
+	if (!query) return
+	adminSearchTimer = setTimeout(() => {
+		searchAdminUsers(query)
+	}, 300)
+})
+
 // Filtered lists for Group Creation restriction
 const filteredAvailableCreateUsers = computed(() => {
+	const query = userSearchCreate.value.trim().toLowerCase()
+	if (!query) return []
 	const selected = new Set(createAllowedUsers.value)
 	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
-	const query = userSearchCreate.value.trim().toLowerCase()
-	if (!query) return unselected.slice(0, 50)
 	return unselected.filter(
 		(u) =>
 			u.displayName.toLowerCase().includes(query)
@@ -642,10 +647,10 @@ const filteredAvailableCreateGroups = computed(() => {
 
 // Filtered lists for App Access restriction - Allowed
 const filteredAvailableAccessAllowedUsers = computed(() => {
+	const query = userSearchAccessAllowed.value.trim().toLowerCase()
+	if (!query) return []
 	const selected = new Set(accessAllowedUsers.value)
 	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
-	const query = userSearchAccessAllowed.value.trim().toLowerCase()
-	if (!query) return unselected.slice(0, 50)
 	return unselected.filter(
 		(u) =>
 			u.displayName.toLowerCase().includes(query)
@@ -668,10 +673,10 @@ const filteredAvailableAccessAllowedGroups = computed(() => {
 
 // Filtered lists for App Access restriction - Forbidden
 const filteredAvailableAccessForbiddenUsers = computed(() => {
+	const query = userSearchAccessForbidden.value.trim().toLowerCase()
+	if (!query) return []
 	const selected = new Set(accessForbiddenUsers.value)
 	const unselected = allSystemUsers.value.filter((u) => !selected.has(u.uid))
-	const query = userSearchAccessForbidden.value.trim().toLowerCase()
-	if (!query) return unselected.slice(0, 50)
 	return unselected.filter(
 		(u) =>
 			u.displayName.toLowerCase().includes(query)

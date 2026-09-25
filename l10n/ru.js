@@ -267,7 +267,6 @@ OC.L10N.register(
     "New owner must be an active member of the group" : "Новый владелец должен быть действующим участником группы",
     "Rejecting requests is only allowed for moderators, managers, or administrator" : "Отклонение запросов доступно только модераторам, управляющим или администратору",
     "Viewing activity log is only allowed for group owner, manager, or administrator" : "Просмотр журнала действий доступен только владельцу группы, управляющему или администратору",
-    "Access allowed only for system administrators" : "Доступ разрешен только администраторам системы"
     "Access allowed only for system administrators" : "Доступ разрешен только администраторам системы",
     "Select users to add to group \"{group}\"." : "Выберите пользователей для добавления в группу «{group}».",
     "No members selected yet. Search and select users below." : "Участники еще не выбраны. Найдите и выберите пользователей ниже.",

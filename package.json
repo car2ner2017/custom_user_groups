@@ -1,7 +1,6 @@
 {
   "name": "user_groups_hzs",
-  "version": "1.3.2",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "scripts": {
