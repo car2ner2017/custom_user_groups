@@ -268,5 +268,16 @@ OC.L10N.register(
     "Rejecting requests is only allowed for moderators, managers, or administrator" : "Отклонение запросов доступно только модераторам, управляющим или администратору",
     "Viewing activity log is only allowed for group owner, manager, or administrator" : "Просмотр журнала действий доступен только владельцу группы, управляющему или администратору",
     "Access allowed only for system administrators" : "Доступ разрешен только администраторам системы"
+    "Access allowed only for system administrators" : "Доступ разрешен только администраторам системы",
+    "Select users to add to group \"{group}\"." : "Выберите пользователей для добавления в группу «{group}».",
+    "No members selected yet. Search and select users below." : "Участники еще не выбраны. Найдите и выберите пользователей ниже.",
+    "Configure access rules for users and groups to the HZS User Groups web interface." : "Настройка правил доступа пользователей и групп к веб-интерфейсу HZS Пользовательские группы.",
+    "No members selected yet. Use the search dropdown below to add members." : "Участники еще не выбраны. Используйте выпадающий поиск ниже для добавления участников.",
+    "Search Nextcloud users to add" : "Поиск пользователей Nextcloud для добавления",
+    "Shared resources of group \"{group}\"" : "Общие ресурсы группы «{group}»",
+    "All ({count})" : "Все ({count})",
+    "Are you sure you want to revoke access of group \"{group}\" to {type} \"{name}\"? Group members will lose access to this resource." : "Вы уверены, что хотите отозвать доступ группы «{group}» к {type} «{name}»? Участники группы потеряют доступ к этому ресурсу.",
+    "You can suggest adding one or more Nextcloud users to group \"{group}\". Requests will be reviewed by the group creator and moderators." : "Вы можете предложить добавление одного или нескольких пользователей Nextcloud в группу «{group}». Заявки будут рассмотрены создателем и модераторами группы.",
+    "No candidates selected yet. Search and select users below." : "Кандидаты еще не выбраны. Найдите и выберите пользователей ниже."
 },
 "nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);");

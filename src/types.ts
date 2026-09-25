@@ -3,6 +3,8 @@ export interface UserOption {
 	uid: string
 	displayName: string
 	email?: string
+	subname?: string
+	user?: string
 }
 
 export interface GroupOption {

@@ -420,6 +420,75 @@ class GroupApiController extends Controller {
 		}
 	}
 
+	/**
+	 * @return list<array{id: string, uid: string, user: string, displayName: string, subname: string, email: string}>
+	 */
+	private function findUsers(string $search, int $limit): array {
+		$search = trim($search);
+		$limit = min(max(1, $limit), 10000);
+
+		$matchedUsers = [];
+
+		if ($search === '') {
+			$users = $this->userManager->search('', $limit);
+			foreach ($users ?: [] as $user) {
+				if ($user instanceof IUser && $user->isEnabled()) {
+					$matchedUsers[$user->getUID()] = $user;
+				}
+			}
+		} else {
+			// 1. Search by UID
+			$byUid = $this->userManager->search($search, $limit);
+			foreach ($byUid ?: [] as $user) {
+				if ($user instanceof IUser && $user->isEnabled()) {
+					$matchedUsers[$user->getUID()] = $user;
+				}
+			}
+
+			// 2. Search by Display Name
+			if (count($matchedUsers) < $limit) {
+				$byDisplayName = $this->userManager->searchDisplayName($search, $limit);
+				foreach ($byDisplayName ?: [] as $user) {
+					if ($user instanceof IUser && $user->isEnabled()) {
+						$matchedUsers[$user->getUID()] = $user;
+					}
+				}
+			}
+
+			// 3. Search by Email if query contains @
+			if (count($matchedUsers) < $limit && str_contains($search, '@')) {
+				$byEmail = $this->userManager->getByEmail($search);
+				foreach ($byEmail ?: [] as $user) {
+					if ($user instanceof IUser && $user->isEnabled()) {
+						$matchedUsers[$user->getUID()] = $user;
+					}
+				}
+			}
+		}
+
+		$result = [];
+		foreach ($matchedUsers as $user) {
+			$uid = $user->getUID();
+			$displayName = $user->getDisplayName() ?: $uid;
+			$email = $user->getEMailAddress() ?: '';
+			$subname = $email !== '' ? $email : ($displayName !== $uid ? '@' . $uid : '');
+
+			$result[] = [
+				'id' => $uid,
+				'uid' => $uid,
+				'user' => $uid,
+				'displayName' => $displayName,
+				'subname' => $subname,
+				'email' => $email,
+			];
+			if (count($result) >= $limit) {
+				break;
+			}
+		}
+
+		return $result;
+	}
+
 	#[NoAdminRequired]
 	#[FrontpageRoute(verb: 'GET', url: '/api/v1/users')]
 	public function searchUsers(string $search = '', int $limit = 5000): JSONResponse {
@@ -427,23 +496,7 @@ class GroupApiController extends Controller {
 			return $err;
 		}
 
-		$search = trim($search);
-		$limit = min(max(1, $limit), 10000);
-		$users = $this->userManager->search($search, $limit);
-
-		$result = [];
-		foreach ($users ?: [] as $user) {
-			if ($user instanceof IUser) {
-				$result[] = [
-					'id' => $user->getUID(),
-					'uid' => $user->getUID(),
-					'displayName' => $user->getDisplayName(),
-					'email' => $user->getEMailAddress() ?: '',
-				];
-			}
-		}
-
-		return new JSONResponse(['users' => $result]);
+		return new JSONResponse(['users' => $this->findUsers($search, $limit)]);
 	}
 
 	// ==========================================
@@ -923,22 +976,7 @@ class GroupApiController extends Controller {
 			return $err;
 		}
 
-		$search = trim($search);
-		$limit = min(max(1, $limit), 10000);
-		$users = $this->userManager->search($search, $limit);
-		$result = [];
-		foreach ($users ?: [] as $user) {
-			if ($user instanceof IUser) {
-				$result[] = [
-					'id' => $user->getUID(),
-					'uid' => $user->getUID(),
-					'displayName' => $user->getDisplayName(),
-					'email' => $user->getEMailAddress() ?: '',
-				];
-			}
-		}
-
-		return new JSONResponse(['users' => $result]);
+		return new JSONResponse(['users' => $this->findUsers($search, $limit)]);
 	}
 
 	#[NoAdminRequired]

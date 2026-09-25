@@ -14,11 +14,11 @@
 			</p>
 
 			<!-- Selected Candidates Section -->
-			<div v-if="selectedCandidates.length > 0" class="form-group">
+			<div class="form-group">
 				<label class="form-label">
 					{{ t('Selected users ({count})', { count: selectedCandidates.length }) }}
 				</label>
-				<div class="selected-candidates-list">
+				<div v-if="selectedCandidates.length > 0" class="selected-candidates-list">
 					<div
 						v-for="user in selectedCandidates"
 						:key="user.uid"
@@ -36,47 +36,18 @@
 						</NcButton>
 					</div>
 				</div>
-			</div>
-			<div v-else class="no-candidates-hint">
-				{{ t('No candidates selected yet. Choose one or more users from the list below.') }}
-			</div>
-
-			<!-- Search filter for users -->
-			<div class="form-group">
-				<label class="form-label">
-					{{ t('Search users') }}
-				</label>
-				<NcTextField
-					v-model="searchQuery"
-					:placeholder="t('Enter user name, email, or login...')"
-					:disabled="submitting" />
-			</div>
-
-			<!-- Candidate Users List -->
-			<div v-if="loadingUsers" class="loading-state">
-				<NcLoadingIcon :size="20" /> {{ t('Loading users...') }}
-			</div>
-			<div v-else-if="filteredUsers.length > 0" class="available-users-list">
-				<div
-					v-for="user in filteredUsers"
-					:key="user.uid"
-					class="user-item"
-					@click="addCandidate(user)">
-					<div class="user-item-info">
-						<span class="user-name">{{ user.displayName }}</span>
-						<span class="user-email">{{ user.email || ('@' + user.uid) }}</span>
-					</div>
-					<NcButton
-						type="tertiary"
-						size="small"
-						:disabled="submitting"
-						@click.stop="addCandidate(user)">
-						+ {{ t('Select') }}
-					</NcButton>
+				<div v-else class="no-candidates-hint">
+					{{ t('No candidates selected yet. Search and select users below.') }}
 				</div>
-			</div>
-			<div v-else class="empty-state">
-				{{ searchQuery.trim() !== '' ? t('No users found for query') : t('All available users are already members of the group or selected') }}
+
+				<!-- Search users dropdown in Nextcloud Files Sharing style -->
+				<UserSearchDropdown
+					input-id="request-candidate-search"
+					:label="t('Search users')"
+					:disabled="submitting"
+					:exclude-uids="excludedUids"
+					:placeholder="t('Search Nextcloud users to add…')"
+					@select="addCandidate" />
 			</div>
 
 			<div class="modal-actions">
@@ -101,11 +72,10 @@
 import { ref, computed, watch } from 'vue'
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
-import NcTextField from '@nextcloud/vue/components/NcTextField'
-import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import UserSearchDropdown from './UserSearchDropdown.vue'
 import type { CustomGroup, UserOption } from '../types'
 import { t } from '../utils/l10n'
 
@@ -119,55 +89,26 @@ const emit = defineEmits<{
 	(e: 'submitted'): void
 }>()
 
-const searchQuery = ref('')
-const availableUsers = ref<UserOption[]>([])
 const selectedCandidates = ref<UserOption[]>([])
-const loadingUsers = ref(false)
 const submitting = ref(false)
+
+const excludedUids = computed(() => {
+	const currentGroupUids = props.group?.members && props.group.members.length > 0
+		? props.group.members.map((m) => m.uid || m.id || '')
+		: (props.group?.member_ids || [])
+	const selected = selectedCandidates.value.map((u) => u.uid)
+	return Array.from(new Set([...currentGroupUids, ...selected]))
+})
 
 watch(
 	() => props.show,
 	(isOpen) => {
 		if (isOpen) {
-			searchQuery.value = ''
 			selectedCandidates.value = []
-			fetchUsers()
 		}
 	},
 	{ immediate: true },
 )
-
-const filteredUsers = computed(() => {
-	if (!props.group) return []
-	const existingUids = new Set(props.group.member_ids || [])
-	const selectedUids = new Set(selectedCandidates.value.map((u) => u.uid))
-	const unselected = availableUsers.value.filter((u) => !existingUids.has(u.uid) && !selectedUids.has(u.uid))
-
-	const query = searchQuery.value.trim().toLowerCase()
-	if (!query) return unselected.slice(0, 50)
-
-	return unselected.filter((u) => {
-		const nameMatch = u.displayName.toLowerCase().includes(query)
-		const uidMatch = u.uid.toLowerCase().includes(query)
-		const emailMatch = u.email ? u.email.toLowerCase().includes(query) : false
-		return nameMatch || uidMatch || emailMatch
-	})
-})
-
-async function fetchUsers() {
-	loadingUsers.value = true
-	try {
-		const url = generateUrl('/apps/user_groups_hzs/api/v1/users')
-		const res = await axios.get(url)
-		if (res.data && Array.isArray(res.data.users)) {
-			availableUsers.value = res.data.users
-		}
-	} catch (err) {
-		console.error('Failed to load users:', err)
-	} finally {
-		loadingUsers.value = false
-	}
-}
 
 function addCandidate(user: UserOption) {
 	if (!selectedCandidates.value.some((u) => u.uid === user.uid)) {
@@ -269,24 +210,6 @@ async function submit() {
 	padding: 8px 12px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
-}
-
-.loading-state,
-.empty-state {
-	padding: 12px;
-	text-align: center;
-	font-size: 13px;
-	color: var(--color-text-maxcontrast);
-	background-color: var(--color-background-hover);
-	border-radius: var(--border-radius-element);
-}
-
-.available-users-list {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	max-height: 180px;
-	overflow-y: auto;
 }
 
 .user-item {

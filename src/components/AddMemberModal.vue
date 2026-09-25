@@ -40,44 +40,16 @@
 					</div>
 				</div>
 				<div v-else class="no-members-hint">
-					{{ t('No members selected yet. Choose users from the list below.') }}
+					{{ t('No members selected yet. Search and select users below.') }}
 				</div>
 
-				<!-- Search input for available users -->
-				<div class="search-user-wrapper">
-					<NcTextField
-						v-model="userSearchQuery"
-						:placeholder="t('Search Nextcloud users to add...')"
-						:disabled="saving" />
-				</div>
-
-				<!-- Available users list -->
-				<div v-if="loadingUsers" class="loading-users">
-					<NcLoadingIcon :size="20" /> {{ t('Loading users...') }}
-				</div>
-				<div v-else-if="filteredAvailableUsers.length > 0" class="available-users-list">
-					<div
-						v-for="user in filteredAvailableUsers"
-						:key="user.uid"
-						class="user-item"
-						@click="addSelected(user)">
-						<div class="user-item-info">
-							<span class="user-displayname">{{ user.displayName }}</span>
-							<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
-						</div>
-						<NcButton
-							type="button"
-							variant="tertiary"
-							size="small"
-							:disabled="saving"
-							@click.stop="addSelected(user)">
-							+ {{ t('Add') }}
-						</NcButton>
-					</div>
-				</div>
-				<div v-else class="empty-users">
-					{{ userSearchQuery.trim() !== '' ? t('No users found for query') : t('All available users are already added to the group') }}
-				</div>
+				<!-- Search users dropdown in Nextcloud Files Sharing style -->
+				<UserSearchDropdown
+					input-id="add-member-search"
+					:disabled="saving"
+					:exclude-uids="excludedUids"
+					:placeholder="t('Search Nextcloud users to add…')"
+					@select="addSelected" />
 			</div>
 
 			<!-- Modal Actions -->
@@ -104,11 +76,10 @@
 import { ref, computed, watch } from 'vue'
 import NcModal from '@nextcloud/vue/components/NcModal'
 import NcButton from '@nextcloud/vue/components/NcButton'
-import NcTextField from '@nextcloud/vue/components/NcTextField'
-import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
+import UserSearchDropdown from './UserSearchDropdown.vue'
 import type { CustomGroup, UserOption } from '../types'
 import { t } from '../utils/l10n'
 
@@ -123,53 +94,25 @@ const emit = defineEmits<{
 }>()
 
 const selectedUsers = ref<UserOption[]>([])
-const availableUsers = ref<UserOption[]>([])
-const userSearchQuery = ref('')
-const loadingUsers = ref(false)
 const saving = ref(false)
+
+const excludedUids = computed(() => {
+	const currentGroupUids = props.group?.members && props.group.members.length > 0
+		? props.group.members.map((m) => m.uid || m.id || '')
+		: (props.group?.member_ids || [])
+	const selected = selectedUsers.value.map((u) => u.uid)
+	return Array.from(new Set([...currentGroupUids, ...selected]))
+})
 
 watch(
 	() => props.show,
 	(isOpen) => {
 		if (isOpen) {
 			selectedUsers.value = []
-			userSearchQuery.value = ''
-			fetchUsers()
 		}
 	},
 	{ immediate: true },
 )
-
-const filteredAvailableUsers = computed(() => {
-	const currentGroupUids = new Set(props.group?.member_ids || [])
-	const selectedUids = new Set(selectedUsers.value.map((u) => u.uid))
-	const unselected = availableUsers.value.filter((u) => !currentGroupUids.has(u.uid) && !selectedUids.has(u.uid))
-
-	const query = userSearchQuery.value.trim().toLowerCase()
-	if (!query) return unselected.slice(0, 50)
-
-	return unselected.filter((u) => {
-		const nameMatch = u.displayName.toLowerCase().includes(query)
-		const uidMatch = u.uid.toLowerCase().includes(query)
-		const emailMatch = u.email ? u.email.toLowerCase().includes(query) : false
-		return nameMatch || uidMatch || emailMatch
-	})
-})
-
-async function fetchUsers() {
-	loadingUsers.value = true
-	try {
-		const url = generateUrl('/apps/user_groups_hzs/api/v1/users')
-		const response = await axios.get(url)
-		if (response.data && Array.isArray(response.data.users)) {
-			availableUsers.value = response.data.users
-		}
-	} catch (err: unknown) {
-		console.error('Error fetching Nextcloud users:', err)
-	} finally {
-		loadingUsers.value = false
-	}
-}
 
 function addSelected(user: UserOption) {
 	if (!selectedUsers.value.some((u) => u.uid === user.uid)) {
@@ -261,31 +204,6 @@ async function submitForm() {
 	padding: 8px 12px;
 	background-color: var(--color-background-hover);
 	border-radius: var(--border-radius-element);
-}
-
-.search-user-wrapper {
-	margin-top: 4px;
-}
-
-.loading-users,
-.empty-users {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 8px;
-	padding: 12px;
-	font-size: 13px;
-	color: var(--color-text-maxcontrast);
-	background: var(--color-background-hover);
-	border-radius: var(--border-radius-element);
-}
-
-.available-users-list {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
-	max-height: 200px;
-	overflow-y: auto;
 }
 
 .user-item {

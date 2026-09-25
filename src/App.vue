@@ -406,6 +406,7 @@
 			:show="showDeleteModal"
 			:title="t('Delete group')"
 			:message="t('Are you sure you want to delete group &quot;{name}&quot;? This action cannot be undone.', { name: groupToDelete?.name || '' })"
+			:message="deleteConfirmMessage"
 			:loading="deleting"
 			@close="showDeleteModal = false"
 			@confirm="confirmDelete" />
@@ -472,6 +473,11 @@ const showSharesModal = ref(false)
 const showDeleteModal = ref(false)
 const groupToDelete = ref<CustomGroup | null>(null)
 const deleting = ref(false)
+const deleteConfirmMessage = computed(() =>
+	t('Are you sure you want to delete group "{name}"? This action cannot be undone.', {
+		name: groupToDelete.value?.name || '',
+	}),
+)
 
 // Requests state
 const groupRequests = ref<MembershipRequest[]>([])

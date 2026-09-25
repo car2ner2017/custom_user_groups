@@ -74,6 +74,13 @@
 						<div v-else class="empty-hint">
 							{{ userSearchCreate.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
+						<UserSearchDropdown
+							input-id="admin-search-create-users"
+							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
+							:disabled="saving"
+							:exclude-uids="createAllowedUsers"
+							:placeholder="t('Search Nextcloud users to add…')"
+							@select="addCreateUser" />
 					</div>
 
 					<!-- Allowed Groups Selection -->
@@ -215,6 +222,13 @@
 						<div v-else class="empty-hint">
 							{{ userSearchAccessAllowed.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
+						<UserSearchDropdown
+							input-id="admin-search-access-allowed-users"
+							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
+							:disabled="saving"
+							:exclude-uids="accessAllowedUsers"
+							:placeholder="t('Search users to allow access…')"
+							@select="addAccessAllowedUser" />
 					</div>
 
 					<!-- Allowed Groups Selection -->
@@ -337,6 +351,13 @@
 						<div v-else class="empty-hint">
 							{{ userSearchAccessForbidden.trim() ? t('No users found') : t('All available users have been added') }}
 						</div>
+						<UserSearchDropdown
+							input-id="admin-search-access-forbidden-users"
+							api-endpoint="/apps/user_groups_hzs/api/v1/admin/users-search"
+							:disabled="saving"
+							:exclude-uids="accessForbiddenUsers"
+							:placeholder="t('Search users to forbid access…')"
+							@select="addAccessForbiddenUser" />
 					</div>
 
 					<!-- Forbidden Groups Selection -->
@@ -430,6 +451,7 @@ import { loadState } from '@nextcloud/initial-state'
 import { generateUrl } from '@nextcloud/router'
 import { showError, showSuccess } from '@nextcloud/dialogs'
 import axios from '@nextcloud/axios'
+import UserSearchDropdown from './UserSearchDropdown.vue'
 import { t } from '../utils/l10n'
 import type { AdminSettingsData, AdminSettingsResponse, GroupOption, UserOption } from '../types'
 
