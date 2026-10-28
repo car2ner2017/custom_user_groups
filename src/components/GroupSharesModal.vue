@@ -453,6 +453,9 @@ function formatDate(dateStr?: string | null | number): string {
 .modal-actions {
 	display: flex;
 	justify-content: flex-end;
-	margin-top: 8px;
+	gap: 12px;
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--color-border);
 }
 </style>

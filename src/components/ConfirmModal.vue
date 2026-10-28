@@ -63,7 +63,8 @@ defineEmits<{
 	display: flex;
 	justify-content: flex-end;
 	gap: 12px;
-	border-top: 1px solid var(--color-border);
+	margin-top: 12px;
 	padding-top: 12px;
+	border-top: 1px solid var(--color-border);
 }
 </style>

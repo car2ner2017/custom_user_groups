@@ -1148,6 +1148,17 @@ class GroupApiController extends Controller {
 			return new JSONResponse(['error' => $this->t('Failed to revoke access: %s', [$e->getMessage()])], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
+		// Snapshot current members affected by the share revocation
+		$memberSnapshot = [];
+		foreach ($group['member_ids'] as $uid) {
+			$u = $this->userManager->get($uid);
+			$memberSnapshot[] = [
+				'uid' => $uid,
+				'displayName' => $u instanceof IUser ? $u->getDisplayName() : $uid,
+				'email' => ($u instanceof IUser && $u->getEMailAddress()) ? $u->getEMailAddress() : '',
+			];
+		}
+
 		// Log activity in group audit trail
 		\OCA\UserGroupsHzs\Listener\ShareDeletedListener::$recentlyLoggedShares[(string)$shareId] = time();
 		$this->activityMapper->logActivity(
@@ -1161,6 +1172,7 @@ class GroupApiController extends Controller {
 				'name' => $nodeName,
 				'owner' => $ownerId,
 				'initiator' => $initiatorId,
+				'members' => $memberSnapshot,
 			]
 		);
 

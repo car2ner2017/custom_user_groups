@@ -188,7 +188,8 @@ const memberRole = computed(() => {
 	display: flex;
 	justify-content: flex-end;
 	gap: 12px;
-	padding-top: 16px;
+	margin-top: 12px;
+	padding-top: 12px;
 	border-top: 1px solid var(--color-border);
 }
 </style>

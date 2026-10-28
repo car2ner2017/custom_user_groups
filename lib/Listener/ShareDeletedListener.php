@@ -9,6 +9,8 @@ use OCA\UserGroupsHzs\Db\CustomGroupActivityMapper;
 use OCA\UserGroupsHzs\Db\CustomGroupMapper;
 use OCP\EventDispatcher\Event;
 use OCP\EventDispatcher\IEventListener;
+use OCP\IUser;
+use OCP\IUserManager;
 use OCP\IUserSession;
 use OCP\Share\Events\BeforeShareDeletedEvent;
 use OCP\Share\IShare;
@@ -25,6 +27,7 @@ class ShareDeletedListener implements IEventListener {
 	public function __construct(
 		private CustomGroupMapper $groupMapper,
 		private CustomGroupActivityMapper $activityMapper,
+		private IUserManager $userManager,
 		private IUserSession $userSession,
 	) {
 	}
@@ -54,6 +57,17 @@ class ShareDeletedListener implements IEventListener {
 		$group = $this->groupMapper->getGroupDetails($groupId);
 		if ($group === null) {
 			return;
+		}
+
+		// Snapshot current members affected by the share revocation
+		$memberSnapshot = [];
+		foreach ($group['member_ids'] as $uid) {
+			$u = $this->userManager->get($uid);
+			$memberSnapshot[] = [
+				'uid' => $uid,
+				'displayName' => $u instanceof IUser ? $u->getDisplayName() : $uid,
+				'email' => ($u instanceof IUser && $u->getEMailAddress()) ? $u->getEMailAddress() : '',
+			];
 		}
 
 		$nodeName = '';
@@ -87,6 +101,7 @@ class ShareDeletedListener implements IEventListener {
 				'name' => $nodeName,
 				'owner' => $share->getShareOwner(),
 				'initiator' => $share->getSharedBy(),
+				'members' => $memberSnapshot,
 			]
 		);
 	}
