@@ -73,8 +73,27 @@
 						</NcButton>
 					</div>
 
-					<div v-if="share.path" class="resource-path" :title="share.path">
-						{{ t('Path: {path}', { path: share.path }) }}
+					<div class="resource-path-wrapper">
+						<button
+							type="button"
+							class="sharing-entry__actions button-vue button-vue--size-normal button-vue--icon-only button-vue--vue-tertiary button-vue--legacy34 button-vue--tertiary action-item action-item--single"
+							menu-align="right"
+							:aria-label="t('Copy internal link')"
+							:title="t('Copy internal link')"
+							@click.stop="copyInternalLink(share, $event)">
+							<span class="button-vue__icon">
+								<svg
+									class="material-design-icon__svg"
+									viewBox="0 0 24 24"
+									width="20"
+									height="20">
+									<path :d="copiedShareId === share.id ? checkIconPath : linkIconPath" fill="currentColor" />
+								</svg>
+							</span>
+						</button>
+						<div v-if="share.path" class="resource-path" :title="share.path">
+							{{ t('Path: {path}', { path: share.path }) }}
+						</div>
 					</div>
 
 					<div class="card-details">
@@ -148,7 +167,84 @@ const props = defineProps<{
 const emit = defineEmits<{
 	(e: 'close'): void
 	(e: 'unshared'): void
+	(e: 'update:sharesCount', count: number): void
 }>()
+
+const linkIconPath = 'M10.59,13.41C11,13.8 11,14.44 10.59,14.83C10.2,15.22 9.56,15.22 9.17,14.83C7.22,12.88 7.22,9.71 9.17,7.76V7.76L12.71,4.22C14.66,2.27 17.83,2.27 19.78,4.22C21.73,6.17 21.73,9.34 19.78,11.29L18.29,12.78C18.3,11.96 18.17,11.14 17.89,10.36L18.36,9.88C19.54,8.71 19.54,6.81 18.36,5.64C17.19,4.46 15.29,4.46 14.12,5.64L10.59,9.17C9.41,10.34 9.41,12.24 10.59,13.41M13.41,9.17C13,8.78 13,8.14 13.41,7.75C13.8,7.36 14.44,7.36 14.83,7.75C16.78,9.7 16.78,12.87 14.83,14.82L11.29,18.36C9.34,20.31 6.17,20.31 4.22,18.36C2.27,16.41 2.27,13.24 4.22,11.29L5.71,9.8C5.7,10.62 5.83,11.44 6.11,12.22L5.64,12.7C4.46,13.87 4.46,15.77 5.64,16.95C6.81,18.13 8.71,18.13 9.88,16.95L13.41,13.41C14.59,12.24 14.59,10.34 13.41,9.17Z'
+const checkIconPath = 'M21,7L9,19L3.5,13.5L4.91,12.09L9,16.17L19.59,5.59L21,7Z'
+const copiedShareId = ref<number | null>(null)
+let copyTimeout: ReturnType<typeof setTimeout> | null = null
+
+const copyInternalLink = (share: GroupShare, event?: MouseEvent) => {
+	const fileId = share.file_source || share.id
+	const urlPath = generateUrl(`/f/${fileId}`)
+	const fullUrl = `${window.location.origin}${urlPath}`
+
+	let success = false
+
+	// Try modern asynchronous Clipboard API if in a secure context
+	if (window.isSecureContext && navigator?.clipboard?.writeText) {
+		navigator.clipboard.writeText(fullUrl).catch((err) => {
+			console.warn('navigator.clipboard.writeText failed:', err)
+		})
+		success = true
+	}
+
+	// Synchronous execCommand fallback (works in HTTP and inside modal)
+	// Must append inside the modal DOM so focus-trap doesn't block focus
+	if (!success) {
+		const targetEl = (event?.currentTarget as HTMLElement) || (event?.target as HTMLElement)
+		const parent = targetEl?.parentElement
+			|| targetEl
+			|| document.querySelector('.modal-container__content')
+			|| document.body
+
+		const textArea = document.createElement('textarea')
+		textArea.value = fullUrl
+		textArea.setAttribute('readonly', '')
+		textArea.style.position = 'fixed'
+		textArea.style.left = '-9999px'
+		textArea.style.top = '0'
+		textArea.style.width = '2em'
+		textArea.style.height = '2em'
+		textArea.style.padding = '0'
+		textArea.style.border = 'none'
+		textArea.style.outline = 'none'
+		textArea.style.boxShadow = 'none'
+		textArea.style.background = 'transparent'
+
+		parent.appendChild(textArea)
+
+		try {
+			textArea.focus({ preventScroll: true })
+			textArea.select()
+			textArea.setSelectionRange(0, fullUrl.length)
+			success = document.execCommand('copy')
+		} catch (err) {
+			console.error('execCommand copy failed:', err)
+		} finally {
+			if (textArea.parentElement) {
+				textArea.parentElement.removeChild(textArea)
+			}
+		}
+	}
+
+	if (success) {
+		copiedShareId.value = share.id
+		if (copyTimeout) {
+			clearTimeout(copyTimeout)
+		}
+		copyTimeout = setTimeout(() => {
+			if (copiedShareId.value === share.id) {
+				copiedShareId.value = null
+			}
+		}, 2000)
+
+		showSuccess(t('Internal link copied to clipboard'))
+	} else {
+		showError(t('Failed to copy link to clipboard'))
+	}
+}
 
 const shares = ref<GroupShare[]>([])
 const loading = ref(false)
@@ -178,6 +274,7 @@ async function fetchShares() {
 		const response = await axios.get(url)
 		if (response.data && Array.isArray(response.data.shares)) {
 			shares.value = response.data.shares
+			emit('update:sharesCount', shares.value.length)
 		}
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
@@ -247,6 +344,7 @@ async function confirmRevokeShare() {
 		showConfirmModal.value = false
 		shareToRevoke.value = null
 		emit('unshared')
+		emit('update:sharesCount', shares.value.length)
 	} catch (err: unknown) {
 		const axiosErr = err as { response?: { data?: { error?: string } }; message?: string }
 		const msg = axiosErr.response?.data?.error || axiosErr.message || t('Error revoking access')
@@ -409,12 +507,47 @@ function formatDate(dateStr?: string | null | number): string {
 	color: inherit;
 }
 
+.resource-path-wrapper {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-top: 4px;
+	margin-bottom: 8px;
+}
+
 .resource-path {
 	font-size: 12px;
 	font-family: monospace;
 	word-break: break-all;
 	padding: 3px 6px;
 	border-radius: var(--border-radius-element);
+	margin: 0;
+	flex: 1;
+}
+
+.sharing-entry__actions {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+	cursor: pointer;
+	border: none;
+	background: transparent;
+	padding: 4px;
+	border-radius: var(--border-radius-pill, 50%);
+	color: var(--color-text-maxcontrast);
+	transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sharing-entry__actions:hover {
+	background-color: var(--color-background-hover);
+	color: var(--color-main-text);
+}
+
+.sharing-entry__actions .button-vue__icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
 
 .card-details {

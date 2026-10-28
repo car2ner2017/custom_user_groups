@@ -70,6 +70,7 @@ export interface CustomGroup {
 	delegates_manage: Delegation[]
 	delegates_moderate: Delegation[]
 	pending_requests_count: number
+	shares_count?: number
 	can_edit: boolean
 	is_creator: boolean
 	is_owner: boolean

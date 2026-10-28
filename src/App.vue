@@ -85,23 +85,27 @@
 								{{ selectedGroup.name }}
 							</h1>
 							<div class="group-meta">
-								<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
-								<span v-if="isAdmin || selectedGroup.is_owner" class="meta-tag creator-tag">
-									{{ t('Creator:') }} {{ selectedGroup.creator_displayName }}
-									<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
-								</span>
-								<span class="meta-tag owner-tag">
-									{{ t('Owner:') }} {{ selectedGroup.owner_displayName || selectedGroup.creator_displayName }}
-									<template v-if="selectedGroup.owner_email || (!selectedGroup.owner_id && selectedGroup.creator_email)">
-										({{ selectedGroup.owner_email || selectedGroup.creator_email }})
-									</template>
-								</span>
-								<span class="meta-tag date-tag">{{ t('Created:') }} {{ formatDate(selectedGroup.created_at) }}</span>
-								<span v-if="isAdmin" class="role-badge admin-badge">{{ t('You are Administrator') }}</span>
-								<span v-if="selectedGroup.is_owner" class="role-badge owner-badge">{{ t('You are Owner') }}</span>
-								<span v-if="selectedGroup.is_creator && !selectedGroup.is_owner" class="role-badge creator-badge">{{ t('You are Creator') }}</span>
-								<span v-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">{{ t('You are Manager') }}</span>
-								<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">{{ t('You are Moderator') }}</span>
+								<div class="group-meta-row">
+									<span v-if="isAdmin" class="meta-tag id-tag">ID: {{ selectedGroup.group_id }}</span>
+									<span class="meta-tag date-tag">{{ t('Created:') }} {{ formatDate(selectedGroup.created_at) }}</span>
+									<span v-if="isAdmin" class="role-badge admin-badge">{{ t('You are Administrator') }}</span>
+									<span v-if="selectedGroup.permissions?.delegation_level === 'manage'" class="role-badge manage-badge">{{ t('You are Manager') }}</span>
+									<span v-if="selectedGroup.permissions?.delegation_level === 'moderate'" class="role-badge moderate-badge">{{ t('You are Moderator') }}</span>
+								</div>
+								<div class="group-meta-row">
+									<span v-if="selectedGroup.is_creator" class="role-badge creator-badge">{{ t('You are Creator') }}</span>
+									<span v-else-if="isAdmin || selectedGroup.is_owner" class="meta-tag creator-tag">
+										{{ t('Creator:') }} {{ selectedGroup.creator_displayName }}
+										<template v-if="selectedGroup.creator_email">({{ selectedGroup.creator_email }})</template>
+									</span>
+									<span v-if="selectedGroup.is_owner" class="role-badge owner-badge">{{ t('You are Owner') }}</span>
+									<span v-else class="meta-tag owner-tag">
+										{{ t('Owner:') }} {{ selectedGroup.owner_displayName || selectedGroup.creator_displayName }}
+										<template v-if="selectedGroup.owner_email || (!selectedGroup.owner_id && selectedGroup.creator_email)">
+											({{ selectedGroup.owner_email || selectedGroup.creator_email }})
+										</template>
+									</span>
+								</div>
 							</div>
 						</div>
 					</div>
@@ -113,12 +117,19 @@
 							@click="showActivityModal = true">
 							{{ t('Activity log') }}
 						</NcButton>
-						<NcButton
-							v-if="selectedGroup.permissions?.can_manage_shares"
-							type="tertiary"
-							@click="showSharesModal = true">
-							{{ t('Shared resources') }}
-						</NcButton>
+						<div v-if="selectedGroup.permissions?.can_manage_shares" class="shares-button-wrapper">
+							<NcButton
+								type="tertiary"
+								@click="showSharesModal = true">
+								{{ t('Shared resources') }}
+							</NcButton>
+							<span
+								v-if="selectedGroup.shares_count !== undefined && selectedGroup.shares_count > 0"
+								class="shares-count-badge"
+								:title="t('{count} shared resources', { count: selectedGroup.shares_count })">
+								{{ selectedGroup.shares_count }}
+							</span>
+						</div>
 						<div
 							v-if="hasLeadingActions && hasTrailingActions"
 							class="action-divider" />
@@ -400,7 +411,8 @@
 			:show="showSharesModal"
 			:group="selectedGroup"
 			@close="showSharesModal = false"
-			@unshared="onResourceUnshared" />
+			@unshared="onResourceUnshared"
+			@update:shares-count="onSharesCountUpdated" />
 
 		<!-- Delete Confirm Modal -->
 		<ConfirmModal
@@ -679,6 +691,12 @@ async function onResourceUnshared() {
 	}
 }
 
+function onSharesCountUpdated(count: number) {
+	if (selectedGroup.value) {
+		selectedGroup.value.shares_count = count
+	}
+}
+
 async function selectGroup(groupId: string) {
 	selectedGroupId.value = groupId
 	memberSearchQuery.value = ''
@@ -939,9 +957,20 @@ async function reloadGroups() {
 
 .group-meta {
 	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 10px 14px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	box-sizing: border-box;
+}
+
+.group-meta-row {
+	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 8px;
+	width: 100%;
 }
 
 .meta-tag {
@@ -1047,6 +1076,33 @@ async function reloadGroups() {
 	gap: 10px;
 }
 
+.shares-button-wrapper {
+	position: relative;
+	display: inline-flex;
+}
+
+.shares-count-badge {
+	position: absolute;
+	top: 0;
+	right: 0;
+	transform: translate(50%, -50%);
+	background-color: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+	font-size: 11px;
+	font-weight: 700;
+	min-width: 18px;
+	height: 18px;
+	line-height: 18px;
+	padding: 0 5px;
+	border-radius: 9px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+	pointer-events: none;
+	z-index: 2;
+}
+
 .action-divider {
 	width: 1px;
 	height: 20px;
@@ -1064,6 +1120,7 @@ async function reloadGroups() {
 	background-color: var(--color-background-hover);
 	border: 1px solid var(--color-border);
 	border-radius: var(--border-radius-element);
+	box-sizing: border-box;
 }
 
 .requests-header {
@@ -1071,6 +1128,8 @@ async function reloadGroups() {
 	justify-content: space-between;
 	align-items: center;
 	margin-bottom: 12px;
+	flex-wrap: wrap;
+	gap: 10px;
 }
 
 .requests-header h2 {
@@ -1086,6 +1145,7 @@ async function reloadGroups() {
 .requests-header-actions {
 	display: flex;
 	align-items: center;
+	flex-wrap: wrap;
 	gap: 8px;
 }
 
@@ -1338,6 +1398,28 @@ async function reloadGroups() {
 	.group-header-actions {
 		width: 100%;
 		justify-content: flex-start;
+	}
+
+	.group-requests-section {
+		padding: 12px 14px;
+	}
+
+	.requests-header {
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 10px;
+	}
+
+	.requests-header-actions {
+		width: 100%;
+		flex-wrap: wrap;
+		justify-content: flex-start;
+		gap: 8px;
+	}
+
+	.request-main-row {
+		flex-wrap: wrap;
+		gap: 8px;
 	}
 }
 </style>

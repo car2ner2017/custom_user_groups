@@ -595,5 +595,22 @@ class CustomGroupMapper extends QBMapper {
 
 		return $shares;
 	}
+
+	/**
+	 * Returns count of shares shared with this custom user group
+	 */
+	public function countGroupShares(string $groupId): int {
+		$qb = $this->db->getQueryBuilder();
+		$qb->select($qb->createFunction('COUNT(*)'))
+			->from('share')
+			->where($qb->expr()->eq('share_type', $qb->createNamedParameter(1, IQueryBuilder::PARAM_INT)))
+			->andWhere($qb->expr()->eq('share_with', $qb->createNamedParameter($groupId)));
+
+		$result = $qb->executeQuery();
+		$count = (int)$result->fetchOne();
+		$result->closeCursor();
+
+		return $count;
+	}
 }
 

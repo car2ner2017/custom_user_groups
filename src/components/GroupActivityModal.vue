@@ -79,7 +79,15 @@
 					</div>
 
 					<div class="card-description">
-						{{ act.description }}
+						<template v-if="(act.action_type === 'share_member_add' || act.action_type === 'share_member_remove') && act.details?.name">
+							<span>{{ act.action_type === 'share_member_add' ? t('Added access to %s', [t(act.details.item_type === 'folder' ? 'folder' : 'file')]) : t('Revoked access to %s', [t(act.details.item_type === 'folder' ? 'folder' : 'file')]) }} </span>
+							<b>«{{ act.details.name }}»</b>
+							<span> {{ t('for user') }} </span>
+							<b>{{ act.target_displayName || act.target_id }}</b>
+						</template>
+						<template v-else>
+							{{ act.description }}
+						</template>
 					</div>
 
 					<div class="card-details">
@@ -119,7 +127,7 @@
 
 						<!-- Event participants list (e.g. for share assignment) -->
 						<div v-if="act.details?.members && act.details.members.length > 0" class="detail-row participants-row">
-							<span class="detail-label">{{ t('Participants:') }}</span>
+							<span v-if="act.action_type !== 'share_assign'" class="detail-label">{{ t('Participants:') }}</span>
 							<NcButton
 								type="tertiary"
 								size="small"

@@ -294,6 +294,13 @@ OC.L10N.register(
     "Granted group access to %s «%s»" : "Предоставлен общий доступ к %s «%s»",
     "Granted group access to resource" : "Предоставлен доступ группы к ресурсу",
     "Added access to %s «%s» for user %s" : "Добавлен доступ к %s «%s» для пользователя %s",
-    "Revoked access to %s «%s» for user %s" : "Отозван доступ к %s «%s» для пользователя %s"
+    "Revoked access to %s «%s» for user %s" : "Отозван доступ к %s «%s» для пользователя %s",
+    "Added access to %s" : "Добавлен доступ к %s",
+    "Revoked access to %s" : "Отозван доступ к %s",
+    "for user" : "для пользователя",
+    "Copy internal link" : "Копировать внутреннюю ссылку",
+    "Internal link copied to clipboard" : "Внутренняя ссылка скопирована в буфер обмена",
+    "Failed to copy link to clipboard" : "Не удалось скопировать ссылку в буфер обмена",
+    "{count} shared resources" : "Общих ресурсов: {count}"
 },
 "nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);");

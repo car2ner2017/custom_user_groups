@@ -1393,6 +1393,7 @@ class GroupApiController extends Controller {
 			'delegates_manage' => $delegatesManage,
 			'delegates_moderate' => $delegatesModerate,
 			'pending_requests_count' => $pendingCount,
+			'shares_count' => $this->mapper->countGroupShares($group['group_id']),
 			'can_edit' => $canModerate,
 			'is_owner' => $isOwner,
 			'is_creator' => $isCreator,
