@@ -54,7 +54,7 @@ class NavigationListener implements IEventListener {
 			'id' => Application::APP_ID,
 			'order' => 10,
 			'href' => $this->urlGenerator->linkToRoute(Application::APP_ID . '.page.index'),
-			'icon' => $this->urlGenerator->imagePath(Application::APP_ID, 'app-dark.svg'),
+			'icon' => $this->urlGenerator->imagePath(Application::APP_ID, 'app.svg'),
 			'name' => $this->l->t('User Groups'),
 			'type' => INavigationManager::TYPE_APPS,
 			'app' => Application::APP_ID,

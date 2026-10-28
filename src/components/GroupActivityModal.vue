@@ -80,9 +80,12 @@
 
 					<div class="card-description">
 						<template v-if="(act.action_type === 'share_member_add' || act.action_type === 'share_member_remove') && act.details?.name">
-							<span>{{ act.action_type === 'share_member_add' ? t('Added access to %s', [t(act.details.item_type === 'folder' ? 'folder' : 'file')]) : t('Revoked access to %s', [t(act.details.item_type === 'folder' ? 'folder' : 'file')]) }} </span>
-							<b>«{{ act.details.name }}»</b>
-							<span> {{ t('for user') }} </span>
+							<span>{{ act.action_type === 'share_member_add' ? t('Added access to') : t('Revoked access to') }}</span>
+							{{ ' ' }}
+							<b>"{{ act.details.name }}"</b>
+							{{ ' ' }}
+							<span>{{ t('for user') }}</span>
+							{{ ' ' }}
 							<b>{{ act.target_displayName || act.target_id }}</b>
 						</template>
 						<template v-else>

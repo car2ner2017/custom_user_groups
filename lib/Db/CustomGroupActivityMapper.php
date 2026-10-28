@@ -178,13 +178,11 @@ class CustomGroupActivityMapper extends QBMapper {
 
 			case CustomGroupActivity::ACTION_SHARE_MEMBER_ADD:
 				$name = $details['name'] ?? '';
-				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
-				return $this->l10n->t('Added access to %s «%s» for user %s', [$itemType, $name, $targetName ?: '']);
+				return $this->l10n->t('Added access to "%s" for user %s', [$name, $targetName ?: '']);
 
 			case CustomGroupActivity::ACTION_SHARE_MEMBER_REMOVE:
 				$name = $details['name'] ?? '';
-				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
-				return $this->l10n->t('Revoked access to %s «%s» for user %s', [$itemType, $name, $targetName ?: '']);
+				return $this->l10n->t('Revoked access to "%s" for user %s', [$name, $targetName ?: '']);
 
 			default:
 				return $this->l10n->t('Group action');
