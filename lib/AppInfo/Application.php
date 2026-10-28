@@ -24,6 +24,14 @@ class Application extends App implements IBootstrap {
 			\OCP\Navigation\Events\LoadAdditionalEntriesEvent::class,
 			\OCA\UserGroupsHzs\Listener\NavigationListener::class
 		);
+		$context->registerEventListener(
+			\OCP\Share\Events\ShareCreatedEvent::class,
+			\OCA\UserGroupsHzs\Listener\ShareCreatedListener::class
+		);
+		$context->registerEventListener(
+			\OCP\Share\Events\BeforeShareDeletedEvent::class,
+			\OCA\UserGroupsHzs\Listener\ShareDeletedListener::class
+		);
 	}
 
 	public function boot(IBootContext $context): void {

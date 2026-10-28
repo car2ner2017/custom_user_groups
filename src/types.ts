@@ -93,19 +93,31 @@ export interface GroupShare {
 	initiator_email?: string
 }
 
+export interface GroupActivityParticipant {
+	uid: string
+	displayName: string
+	email?: string
+}
+
 export interface GroupActivityDetails {
 	old_name?: string
 	new_name?: string
 	old_owner?: string
 	new_owner?: string
 	level?: 'manage' | 'moderate'
+	share_id?: number
+	item_type?: 'file' | 'folder'
+	name?: string
+	owner?: string
+	initiator?: string
+	members?: GroupActivityParticipant[]
 	[key: string]: unknown
 }
 
 export interface GroupActivity {
 	id: number
 	group_id: string
-	action_type: 'member_add' | 'member_remove' | 'delegation_assign' | 'delegation_revoke' | 'name_change' | 'owner_transfer' | 'share_unshare'
+	action_type: 'member_add' | 'member_remove' | 'delegation_assign' | 'delegation_revoke' | 'name_change' | 'owner_transfer' | 'share_unshare' | 'share_assign' | 'share_member_add' | 'share_member_remove'
 	actor_id: string
 	actor_displayName: string
 	actor_email: string

@@ -28,6 +28,13 @@
 					<button
 						type="button"
 						class="tab-button"
+						:class="{ active: categoryFilter === 'shares' }"
+						@click="categoryFilter = 'shares'">
+						{{ t('Shares') }} ({{ countShares }})
+					</button>
+					<button
+						type="button"
+						class="tab-button"
 						:class="{ active: categoryFilter === 'delegations' }"
 						@click="categoryFilter = 'delegations'">
 						{{ t('Delegation') }} ({{ countDelegations }})
@@ -109,6 +116,17 @@
 								{{ act.details.level === 'manage' ? t('Manage') : t('Moderate') }}
 							</span>
 						</div>
+
+						<!-- Event participants list (e.g. for share assignment) -->
+						<div v-if="act.details?.members && act.details.members.length > 0" class="detail-row participants-row">
+							<span class="detail-label">{{ t('Participants:') }}</span>
+							<NcButton
+								type="tertiary"
+								size="small"
+								@click="openParticipantsModal(act.details.members)">
+								{{ t('Show participants') }}
+							</NcButton>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -120,6 +138,43 @@
 					{{ t('Close') }}
 				</NcButton>
 			</div>
+
+			<!-- Event Participants Modal -->
+			<NcModal
+				v-if="showParticipantsModal"
+				:name="t('Event participants')"
+				size="normal"
+				@close="showParticipantsModal = false">
+				<div class="participants-modal-content">
+					<h2 class="form-title">
+						{{ t('Event participants ({count})', { count: selectedParticipants.length }) }}
+					</h2>
+
+					<div class="participants-list">
+						<div
+							v-for="user in selectedParticipants"
+							:key="user.uid"
+							class="user-item">
+							<div class="user-avatar">
+								{{ (user.displayName || user.uid).charAt(0).toUpperCase() }}
+							</div>
+							<div class="user-item-info">
+								<span class="user-displayname">{{ user.displayName }}</span>
+								<span class="user-email-uid">{{ user.email || ('@' + user.uid) }}</span>
+							</div>
+						</div>
+					</div>
+
+					<div class="modal-actions">
+						<NcButton
+							type="button"
+							variant="secondary"
+							@click="showParticipantsModal = false">
+							{{ t('Close') }}
+						</NcButton>
+					</div>
+				</div>
+			</NcModal>
 		</div>
 	</NcModal>
 </template>
@@ -133,7 +188,7 @@ import NcLoadingIcon from '@nextcloud/vue/components/NcLoadingIcon'
 import axios from '@nextcloud/axios'
 import { generateUrl } from '@nextcloud/router'
 import { t } from '../utils/l10n'
-import type { CustomGroup, GroupActivity } from '../types'
+import type { CustomGroup, GroupActivity, GroupActivityParticipant } from '../types'
 
 const props = defineProps<{
 	show: boolean
@@ -146,8 +201,16 @@ defineEmits<{
 
 const activities = ref<GroupActivity[]>([])
 const loading = ref(false)
-const categoryFilter = ref<'all' | 'members' | 'delegations' | 'settings'>('all')
+const categoryFilter = ref<'all' | 'members' | 'shares' | 'delegations' | 'settings'>('all')
 const searchFilter = ref('')
+
+const showParticipantsModal = ref(false)
+const selectedParticipants = ref<GroupActivityParticipant[]>([])
+
+function openParticipantsModal(members: GroupActivityParticipant[]) {
+	selectedParticipants.value = members
+	showParticipantsModal.value = true
+}
 
 watch(
 	() => props.show,
@@ -180,22 +243,38 @@ const countMembers = computed(() => {
 	return activities.value.filter((a) => a.action_type === 'member_add' || a.action_type === 'member_remove').length
 })
 
+const countShares = computed(() => {
+	return activities.value.filter((a) =>
+		a.action_type === 'share_assign'
+		|| a.action_type === 'share_unshare'
+		|| a.action_type === 'share_member_add'
+		|| a.action_type === 'share_member_remove',
+	).length
+})
+
 const countDelegations = computed(() => {
 	return activities.value.filter((a) => a.action_type === 'delegation_assign' || a.action_type === 'delegation_revoke').length
 })
 
 const countSettings = computed(() => {
-	return activities.value.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer' || a.action_type === 'share_unshare').length
+	return activities.value.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer').length
 })
 
 const filteredActivities = computed(() => {
 	let list = activities.value
 	if (categoryFilter.value === 'members') {
 		list = list.filter((a) => a.action_type === 'member_add' || a.action_type === 'member_remove')
+	} else if (categoryFilter.value === 'shares') {
+		list = list.filter((a) =>
+			a.action_type === 'share_assign'
+			|| a.action_type === 'share_unshare'
+			|| a.action_type === 'share_member_add'
+			|| a.action_type === 'share_member_remove',
+		)
 	} else if (categoryFilter.value === 'delegations') {
 		list = list.filter((a) => a.action_type === 'delegation_assign' || a.action_type === 'delegation_revoke')
 	} else if (categoryFilter.value === 'settings') {
-		list = list.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer' || a.action_type === 'share_unshare')
+		list = list.filter((a) => a.action_type === 'name_change' || a.action_type === 'owner_transfer')
 	}
 
 	const query = searchFilter.value.trim().toLowerCase()
@@ -225,8 +304,14 @@ function getActionLabel(type: string): string {
 		return t('Group renamed')
 	case 'owner_transfer':
 		return t('Ownership transferred')
+	case 'share_assign':
+		return t('Share granted')
 	case 'share_unshare':
-		return t('Access revoked')
+		return t('Share revoked')
+	case 'share_member_add':
+		return t('Resource member added')
+	case 'share_member_remove':
+		return t('Resource member removed')
 	default:
 		return t('Action')
 	}
@@ -267,16 +352,17 @@ function formatDate(dateStr?: string | null): string {
 
 .filters-bar {
 	display: flex;
-	justify-content: space-between;
-	align-items: center;
+	flex-direction: column;
+	align-items: stretch;
 	gap: 12px;
-	flex-wrap: wrap;
+	width: 100%;
 }
 
 .category-tabs {
 	display: flex;
 	gap: 6px;
 	flex-wrap: wrap;
+	width: 100%;
 }
 
 .tab-button {
@@ -302,8 +388,12 @@ function formatDate(dateStr?: string | null): string {
 }
 
 .search-input-wrapper {
-	flex: 1;
-	max-width: 320px;
+	width: 100%;
+	max-width: 100%;
+}
+
+.search-input-wrapper :deep(.input-field) {
+	width: 100%;
 }
 
 .loading-state,
@@ -355,7 +445,13 @@ function formatDate(dateStr?: string | null): string {
 	border-left: 4px solid var(--color-primary-element);
 }
 
-.activity-card.type-share_unshare {
+.activity-card.type-share_assign,
+.activity-card.type-share_member_add {
+	border-left: 4px solid var(--color-border-success, var(--color-success));
+}
+
+.activity-card.type-share_unshare,
+.activity-card.type-share_member_remove {
 	border-left: 4px solid var(--color-border-error, var(--color-error));
 }
 
@@ -391,7 +487,13 @@ function formatDate(dateStr?: string | null): string {
 	background-color: var(--color-primary-element-light);
 }
 
-.tag-share_unshare {
+.tag-share_assign,
+.tag-share_member_add {
+	background-color: rgba(70, 186, 97, 0.15);
+}
+
+.tag-share_unshare,
+.tag-share_member_remove {
 	background-color: rgba(224, 76, 56, 0.15);
 }
 
@@ -438,6 +540,73 @@ function formatDate(dateStr?: string | null): string {
 .detail-sub {
 	font-weight: normal;
 	color: var(--color-text-maxcontrast);
+}
+
+.participants-row {
+	margin-top: 4px;
+}
+
+.participants-modal-content {
+	padding: 16px 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 16px;
+}
+
+.participants-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	max-height: 360px;
+	overflow-y: auto;
+	padding-right: 4px;
+}
+
+.user-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 8px 12px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--border-radius-element);
+	background-color: var(--color-background-hover);
+}
+
+.user-avatar {
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	background: var(--color-primary-element);
+	color: var(--color-primary-element-text);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: bold;
+	font-size: 14px;
+	flex-shrink: 0;
+}
+
+.user-item-info {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.user-displayname {
+	font-size: 14px;
+	font-weight: 500;
+	color: var(--color-main-text);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.user-email-uid {
+	font-size: 12px;
+	color: var(--color-text-maxcontrast);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 .modal-actions {

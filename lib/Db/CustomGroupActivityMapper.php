@@ -160,6 +160,14 @@ class CustomGroupActivityMapper extends QBMapper {
 					? $this->l10n->t('Group ownership transferred to member %s', [$targetName])
 					: $this->l10n->t('Group ownership transferred');
 
+			case CustomGroupActivity::ACTION_SHARE_ASSIGN:
+				$name = $details['name'] ?? '';
+				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
+				if ($name !== '') {
+					return $this->l10n->t('Granted group access to %s «%s»', [$itemType, $name]);
+				}
+				return $this->l10n->t('Granted group access to resource');
+
 			case CustomGroupActivity::ACTION_SHARE_UNSHARE:
 				$name = $details['name'] ?? '';
 				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
@@ -167,6 +175,16 @@ class CustomGroupActivityMapper extends QBMapper {
 					return $this->l10n->t('Revoked group access to %s «%s»', [$itemType, $name]);
 				}
 				return $this->l10n->t('Revoked group access to resource');
+
+			case CustomGroupActivity::ACTION_SHARE_MEMBER_ADD:
+				$name = $details['name'] ?? '';
+				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
+				return $this->l10n->t('Added access to %s «%s» for user %s', [$itemType, $name, $targetName ?: '']);
+
+			case CustomGroupActivity::ACTION_SHARE_MEMBER_REMOVE:
+				$name = $details['name'] ?? '';
+				$itemType = ($details['item_type'] ?? '') === 'folder' ? $this->l10n->t('folder') : $this->l10n->t('file');
+				return $this->l10n->t('Revoked access to %s «%s» for user %s', [$itemType, $name, $targetName ?: '']);
 
 			default:
 				return $this->l10n->t('Group action');

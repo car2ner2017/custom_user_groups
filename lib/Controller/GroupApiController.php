@@ -289,10 +289,12 @@ class GroupApiController extends Controller {
 				$this->delegationMapper->removeDelegation($groupId, $uid);
 				$this->auditService->auditMemberRemoved($groupId, $existing['name'], $uid, $currentUid);
 				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_REMOVE, $currentUid, $uid);
+				$this->logShareMemberEvents($groupId, $currentUid, $uid, 'remove');
 			}
 			foreach ($toAdd as $uid) {
 				$this->auditService->auditMemberAdded($groupId, $existing['name'], $uid, $currentUid);
 				$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $uid);
+				$this->logShareMemberEvents($groupId, $currentUid, $uid, 'add');
 			}
 
 			// Dispatch Nextcloud core group events
@@ -735,6 +737,7 @@ class GroupApiController extends Controller {
 			}
 			$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
 			$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $candidateId);
+			$this->logShareMemberEvents($groupId, $currentUid, $candidateId, 'add');
 			return new JSONResponse(['success' => true, 'added_directly' => true], Http::STATUS_CREATED);
 		}
 
@@ -795,6 +798,7 @@ class GroupApiController extends Controller {
 		$this->auditService->auditRequestApproved($groupId, $group['name'], $candidateId, $currentUid);
 		$this->auditService->auditMemberAdded($groupId, $group['name'], $candidateId, $currentUid);
 		$this->activityMapper->logActivity($groupId, CustomGroupActivity::ACTION_MEMBER_ADD, $currentUid, $candidateId, ['via_request' => true]);
+		$this->logShareMemberEvents($groupId, $currentUid, $candidateId, 'add');
 
 		return new JSONResponse([
 			'success' => true,
@@ -1145,6 +1149,7 @@ class GroupApiController extends Controller {
 		}
 
 		// Log activity in group audit trail
+		\OCA\UserGroupsHzs\Listener\ShareDeletedListener::$recentlyLoggedShares[(string)$shareId] = time();
 		$this->activityMapper->logActivity(
 			$groupId,
 			CustomGroupActivity::ACTION_SHARE_UNSHARE,
@@ -1392,5 +1397,35 @@ class GroupApiController extends Controller {
 				'delegation_level' => $userDelegationLevel,
 			],
 		];
+	}
+
+	/**
+	 * Log member access grant/revocation for all active group shares.
+	 */
+	private function logShareMemberEvents(string $groupId, string $actorId, string $targetUid, string $action): void {
+		$shares = $this->mapper->getGroupShares($groupId);
+		if (empty($shares)) {
+			return;
+		}
+		$actionType = ($action === 'add')
+			? CustomGroupActivity::ACTION_SHARE_MEMBER_ADD
+			: CustomGroupActivity::ACTION_SHARE_MEMBER_REMOVE;
+
+		foreach ($shares as $s) {
+			$name = $s['file_name'] ?: basename($s['file_target'] ?: 'resource');
+			$this->activityMapper->logActivity(
+				$groupId,
+				$actionType,
+				$actorId,
+				$targetUid,
+				[
+					'share_id' => $s['id'],
+					'item_type' => $s['item_type'],
+					'name' => $name,
+					'owner' => $s['uid_owner'],
+					'initiator' => $s['uid_initiator'],
+				]
+			);
+		}
 	}
 }

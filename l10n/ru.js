@@ -281,6 +281,19 @@ OC.L10N.register(
     "Group member" : "Участник группы",
     "Exclude" : "Исключить",
     "User excluded from group" : "Пользователь исключен из группы",
-    "Failed to exclude user" : "Не удалось исключить пользователя"
+    "Failed to exclude user" : "Не удалось исключить пользователя",
+    "Shares" : "Общие ресурсы",
+    "Participants:" : "Участники:",
+    "Show participants" : "Показать участников",
+    "Event participants" : "Участники события",
+    "Event participants ({count})" : "Участники события ({count})",
+    "Share granted" : "Общий доступ",
+    "Share revoked" : "Доступ отозван",
+    "Resource member added" : "Доступ к ресурсу",
+    "Resource member removed" : "Доступ отозван",
+    "Granted group access to %s «%s»" : "Предоставлен общий доступ к %s «%s»",
+    "Granted group access to resource" : "Предоставлен доступ группы к ресурсу",
+    "Added access to %s «%s» for user %s" : "Добавлен доступ к %s «%s» для пользователя %s",
+    "Revoked access to %s «%s» for user %s" : "Отозван доступ к %s «%s» для пользователя %s"
 },
 "nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);");
