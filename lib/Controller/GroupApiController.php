@@ -1142,9 +1142,13 @@ class GroupApiController extends Controller {
 		$ownerId = $share->getShareOwner();
 		$initiatorId = $share->getSharedBy();
 
+		// Prevent duplicate logging in ShareDeletedListener when triggered by deleteShare
+		\OCA\UserGroupsHzs\Listener\ShareDeletedListener::$recentlyLoggedShares[(string)$shareId] = time();
+
 		try {
 			$this->shareManager->deleteShare($share);
 		} catch (Exception $e) {
+			unset(\OCA\UserGroupsHzs\Listener\ShareDeletedListener::$recentlyLoggedShares[(string)$shareId]);
 			return new JSONResponse(['error' => $this->t('Failed to revoke access: %s', [$e->getMessage()])], Http::STATUS_INTERNAL_SERVER_ERROR);
 		}
 
@@ -1160,7 +1164,6 @@ class GroupApiController extends Controller {
 		}
 
 		// Log activity in group audit trail
-		\OCA\UserGroupsHzs\Listener\ShareDeletedListener::$recentlyLoggedShares[(string)$shareId] = time();
 		$this->activityMapper->logActivity(
 			$groupId,
 			CustomGroupActivity::ACTION_SHARE_UNSHARE,

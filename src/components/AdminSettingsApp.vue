@@ -847,6 +847,13 @@ async function save() {
 	gap: 8px;
 }
 
+.restriction-details .picker-group {
+	padding: 16px;
+	background-color: var(--color-main-background);
+	border-radius: var(--border-radius-element);
+	border: 1px solid var(--color-border);
+}
+
 .picker-label {
 	font-size: 14px;
 	font-weight: 600;
